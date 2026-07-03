@@ -49,6 +49,7 @@ export function CommitGraph({
   }, [payload.commits, payload.headHash]);
 
   const svgContent = useMemo(() => {
+    const defs: string[] = [];
     const connectors: string[] = [];
     const graph: string[] = [];
     const CURVE = ROW_H * 0.72;
@@ -130,12 +131,27 @@ export function CommitGraph({
           `<circle cx="${x}" cy="${y}" r="2.5" fill="var(--bg,#1a1f24)"/>`,
         );
       } else {
-        graph.push(
-          `<circle cx="${x}" cy="${y}" r="${r}" fill="hsl(${c.hu} 45% 55%)" stroke="${color}" stroke-width="2"/>`,
-        );
-        graph.push(
-          `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="middle" font-size="${r * 0.72}" font-weight="700" fill="#fff" font-family="Open Sans, Arial, sans-serif">${esc(c.i)}</text>`,
-        );
+        const avatarUrl = payload.avatars[c.g];
+        if (avatarUrl) {
+          const clipId = `av-${i}`;
+          const s = (r - 1) * 2;
+          defs.push(
+            `<clipPath id="${clipId}"><circle cx="${x}" cy="${y}" r="${r - 1}"/></clipPath>`,
+          );
+          graph.push(
+            `<circle cx="${x}" cy="${y}" r="${r}" fill="#1c1e23" stroke="${color}" stroke-width="2"/>`,
+          );
+          graph.push(
+            `<image href="${avatarUrl}" x="${x - r + 1}" y="${y - r + 1}" width="${s}" height="${s}" clip-path="url(#${clipId})"/>`,
+          );
+        } else {
+          graph.push(
+            `<circle cx="${x}" cy="${y}" r="${r}" fill="hsl(${c.hu} 45% 55%)" stroke="${color}" stroke-width="2"/>`,
+          );
+          graph.push(
+            `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="middle" font-size="${r * 0.72}" font-weight="700" fill="#fff" font-family="Open Sans, Arial, sans-serif">${esc(c.i)}</text>`,
+          );
+        }
       }
       if (c.h === payload.headHash) {
         graph.push(
@@ -146,7 +162,7 @@ export function CommitGraph({
 
     return [
       ...connectors,
-      `<g transform="translate(${labelsW},0)">${graph.join("")}</g>`,
+      `<g transform="translate(${labelsW},0)"><defs>${defs.join("")}</defs>${graph.join("")}</g>`,
     ].join("");
   }, [payload, PAL, off, hasWip, headCommit, headIdx, labelsW]);
 

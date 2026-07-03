@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, net } from 'electron';
 import path from 'path';
 import { execFileSync } from 'child_process';
 import crypto from 'crypto';
@@ -190,7 +190,136 @@ function computeLayout(commits: any[]) {
   return { edges: resolved, maxLanes };
 }
 
-function buildPayload(repoPath: string, maxCommits = MAX_COMMITS) {
+// ---------------------------------------------------------------------------
+// Avatar cache (GitHub)
+// ---------------------------------------------------------------------------
+
+const avatarCache = new Map<string, string>(); // email → data:image/...
+
+function parseGitHubRemote(repo: string): string | null {
+  try {
+    const remote = runGit(repo, 'remote', 'get-url', 'origin').trim();
+    const m = remote.match(/github\.com[:/]([^/]+\/[^/.]+)/);
+    return m ? m[1].replace(/\.git$/, '') : null;
+  } catch { return null; }
+}
+
+async function downloadAvatar(url: string): Promise<string> {
+  const imgRes = await net.fetch(url, { signal: AbortSignal.timeout(4000) });
+  if (!imgRes.ok) return '';
+  const buf = Buffer.from(await imgRes.arrayBuffer());
+  const ct = imgRes.headers.get('content-type') || 'image/png';
+  return `data:${ct};base64,${buf.toString('base64')}`;
+}
+
+async function fetchAvatarsFromGitHub(
+  repoSlug: string,
+  emails: string[],
+): Promise<Map<string, string>> {
+  const result = new Map<string, string>();
+  const pending = new Set(emails);
+  try {
+    // Fetch enough pages to cover all unique emails
+    const res = await net.fetch(
+      `https://api.github.com/repos/${repoSlug}/commits?per_page=100`,
+      { signal: AbortSignal.timeout(8000), headers: { 'User-Agent': 'GitShark' } },
+    );
+    if (!res.ok) return result;
+    const data: any[] = await res.json();
+
+    for (const item of data) {
+      const email = item.commit?.author?.email?.trim().toLowerCase();
+      if (!email || !pending.has(email)) continue;
+      const avatarUrl = item.author?.avatar_url;
+      if (!avatarUrl) continue;
+      result.set(email, avatarUrl);
+      pending.delete(email);
+      if (pending.size === 0) break;
+    }
+  } catch {}
+  return result;
+}
+
+async function fetchAvatars(
+  commits: { author: string; email: string; g: string }[],
+  repoPath: string,
+): Promise<Record<string, string>> {
+  // Collect unique emails and map email → hashes
+  const emailToHashes = new Map<string, string[]>();
+  for (const c of commits) {
+    const email = c.email.trim().toLowerCase();
+    if (!emailToHashes.has(email)) emailToHashes.set(email, []);
+    const arr = emailToHashes.get(email)!;
+    if (!arr.includes(c.g)) arr.push(c.g);
+  }
+
+  const uniqueEmails = [...emailToHashes.keys()];
+  const emailAvatars = new Map<string, string>();
+
+  // 1. Check cache first
+  const uncached: string[] = [];
+  for (const email of uniqueEmails) {
+    if (avatarCache.has(email)) emailAvatars.set(email, avatarCache.get(email)!);
+    else uncached.push(email);
+  }
+
+  // 2. For uncached: resolve avatar URLs via GitHub repo commits API
+  if (uncached.length > 0) {
+    const slug = parseGitHubRemote(repoPath);
+    const avatarUrls = slug
+      ? await fetchAvatarsFromGitHub(slug, uncached)
+      : new Map<string, string>();
+
+    // 3. Handle noreply emails as fallback
+    for (const email of uncached) {
+      if (avatarUrls.has(email)) continue;
+      const m = email.match(/^(?:\d+\+)?([^@]+)@users\.noreply\.github\.com$/);
+      if (m) avatarUrls.set(email, `https://avatars.githubusercontent.com/${m[1]}?s=64`);
+    }
+
+    // 4. Download images in parallel and cache
+    await Promise.all(
+      uncached.map(async (email) => {
+        const url = avatarUrls.get(email);
+        if (!url) { avatarCache.set(email, ''); return; }
+        const dataUrl = await downloadAvatar(`${url}${url.includes('?') ? '&' : '?'}s=64`);
+        avatarCache.set(email, dataUrl);
+        emailAvatars.set(email, dataUrl);
+      }),
+    );
+  }
+
+  // Build author → emails groups (same person may use different emails)
+  const byAuthor = new Map<string, Set<string>>();
+  for (const c of commits) {
+    const name = c.author.trim().toLowerCase();
+    if (!byAuthor.has(name)) byAuthor.set(name, new Set());
+    byAuthor.get(name)!.add(c.email.trim().toLowerCase());
+  }
+
+  // For each author, find the best avatar across all their emails
+  const bestByEmail = new Map<string, string>();
+  for (const emails of byAuthor.values()) {
+    let bestUrl = '';
+    for (const e of emails) {
+      const url = emailAvatars.get(e) || '';
+      if (url) { bestUrl = url; break; }
+    }
+    if (bestUrl) for (const e of emails) bestByEmail.set(e, bestUrl);
+  }
+
+  // Map hash → data URL
+  const out: Record<string, string> = {};
+  for (const [email, hashes] of emailToHashes) {
+    const url = bestByEmail.get(email) || emailAvatars.get(email) || '';
+    if (url) for (const h of hashes) out[h] = url;
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+
+async function buildPayload(repoPath: string, maxCommits = MAX_COMMITS) {
   const repo = resolveRepoRoot(repoPath);
   const { commits, currentBranch, headHash, wip, repoName } =
     collectRepoData(repo, maxCommits);
@@ -204,22 +333,27 @@ function buildPayload(repoPath: string, maxCommits = MAX_COMMITS) {
   const slim = commits.map((c: any) => {
     const words = c.author.split(/\s+/).slice(0, 2);
     const initials = words.map((w: string) => w[0] || '').join('').toUpperCase() || '?';
-    const avatarHue =
-      parseInt(crypto.createHash('md5').update(c.email).digest('hex'), 16) % 360;
+    const emailHash = crypto.createHash('md5').update(c.email.trim().toLowerCase()).digest('hex');
+    const avatarHue = parseInt(emailHash, 16) % 360;
     return {
       h: c.hash, s: c.short, a: c.author,
-      i: initials, hu: avatarHue, d: c.date,
+      i: initials, hu: avatarHue, g: emailHash, d: c.date,
       m: c.subject, r: c.refs, l: c.lane,
       k: c.color, np: c.parents.length,
       mg: c.parents.length > 1 ? 1 : 0,
     };
   });
 
+  const avatarInput = commits.map((c: any, i: number) => ({
+    author: c.author, email: c.email, g: slim[i].g,
+  }));
+  const avatars = await fetchAvatars(avatarInput, repo);
+
   return {
     repoPath: repo, repoName,
     currentBranch, headHash,
     wip, commits: slim, edges,
-    maxLanes, palette: PALETTE,
+    maxLanes, palette: PALETTE, avatars,
   };
 }
 
@@ -277,9 +411,9 @@ ipcMain.handle('pick-folder', async () => {
   return { path: result.filePaths[0] };
 });
 
-ipcMain.handle('load-repo', (_event, repoPath: string, maxCommits?: number) => {
+ipcMain.handle('load-repo', async (_event, repoPath: string, maxCommits?: number) => {
   try {
-    return buildPayload(repoPath, maxCommits || MAX_COMMITS);
+    return await buildPayload(repoPath, maxCommits || MAX_COMMITS);
   } catch (err: any) {
     return { error: err.message };
   }

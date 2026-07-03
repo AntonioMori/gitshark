@@ -18,7 +18,6 @@ import {
   rowY,
   esc,
   relTime,
-  chipColor,
 } from "./utils";
 
 // ----------------------------------------------------------------------
@@ -114,13 +113,13 @@ export function CommitGraph({
         y = rowY(i + off);
       const color = PAL[c.k % PAL.length];
       const r = 9;
+
       if (c.r.length > 0) {
         const lineEnd = labelsW + laneX(c.l) - r - 2;
         const grouped = groupRefs(c.r, payload.currentBranch);
         const isCurrentRef = grouped.length > 0 && grouped[0].isCurrent;
-        const connectorColor = grouped.length > 0 ? chipColor(grouped[0]) : color;
         connectors.push(
-          `<path d="M24 ${y} L${lineEnd} ${y}" fill="none" stroke="${connectorColor}" stroke-width="1.2" opacity="${isCurrentRef ? "1" : ".45"}"/>`,
+          `<path d="M24 ${y} L${lineEnd} ${y}" fill="none" stroke="${color}" stroke-width="1.2" opacity="${isCurrentRef ? "1" : ".45"}"/>`,
         );
       }
       if (c.mg) {
@@ -135,7 +134,7 @@ export function CommitGraph({
           `<circle cx="${x}" cy="${y}" r="${r}" fill="hsl(${c.hu} 45% 55%)" stroke="${color}" stroke-width="2"/>`,
         );
         graph.push(
-          `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="middle" font-size="${r * 0.72}" font-weight="700" fill="#fff" font-family="Segoe UI, sans-serif">${esc(c.i)}</text>`,
+          `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="middle" font-size="${r * 0.72}" font-weight="700" fill="#fff" font-family="Open Sans, Arial, sans-serif">${esc(c.i)}</text>`,
         );
       }
       if (c.h === payload.headHash) {
@@ -287,7 +286,7 @@ export function CommitGraph({
                 style={{ "--chip-color": color } as React.CSSProperties}
                 gridCols={`${labelsW}px ${graphW}px 1fr`}
               >
-                <RefLabels groups={grouped} />
+                <RefLabels groups={grouped} laneColor={color} />
                 <div />
                 <Box
                   sx={{

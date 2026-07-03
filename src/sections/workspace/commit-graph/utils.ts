@@ -7,9 +7,10 @@ import type { GroupedRef } from "./commit-graph-types";
 export const LANE_W = 22;
 export const GRAPH_PAD = 14;
 export const SPACER = 1;
-export const FONT = "'Segoe UI', sans-serif";
+export const FONT = "'Open Sans', Arial, sans-serif";
+export const MONO_FONT = "'JetBrains Mono', Consolas, Monaco, Menlo, monospace";
 
-export const ROW_H = window.screen.width > 1536 ? 22 : 27;
+export const ROW_H = 22;
 export const ROW_STRIDE = ROW_H + 6;
 
 export function laneX(l: number) {
@@ -50,24 +51,25 @@ export function relTime(iso: string) {
 
 // ----------------------------------------------------------------------
 
-const MAIN_BRANCHES = new Set(["main", "master", "develop", "dev"]);
+// Blend palette color with graph background to produce chip bg
+const BG = [0x1c, 0x1e, 0x23];
 
-export function chipColor(group: GroupedRef): string {
-  const { ref, isCurrent, isTag } = group;
-  if (isTag) return "#39174b";
-  if (isCurrent) return "#195f71";
-  const baseName = ref.name.replace(/^origin\//, "");
-  if (MAIN_BRANCHES.has(baseName)) return "#39174b";
-  return "#1a3f4a";
-}
-
-export function chipColorDark(group: GroupedRef): string {
-  const { ref, isCurrent, isTag } = group;
-  if (isTag) return "#2a1038";
-  if (isCurrent) return "#113d4d";
-  const baseName = ref.name.replace(/^origin\//, "");
-  if (MAIN_BRANCHES.has(baseName)) return "#2a1038";
-  return "#122a32";
+export function chipBg(hex: string, mix = 0.22): string {
+  const c = [
+    parseInt(hex.slice(1, 3), 16),
+    parseInt(hex.slice(3, 5), 16),
+    parseInt(hex.slice(5, 7), 16),
+  ];
+  return (
+    "#" +
+    c
+      .map((v, i) =>
+        Math.round(v * mix + BG[i] * (1 - mix))
+          .toString(16)
+          .padStart(2, "0"),
+      )
+      .join("")
+  );
 }
 
 export function groupRefs(

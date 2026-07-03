@@ -13,8 +13,8 @@ const RECORD_SEP = '\x1e';
 const MAX_COMMITS = 500;
 
 const PALETTE = [
-  '#00bcd4', '#b158e0', '#ec4899', '#4f8ff7', '#34d399', '#f5a623',
-  '#ef5350', '#e5c122', '#14b8a6', '#f97316', '#8b8ff7', '#7bd148',
+  '#15A0BF', '#0669F7', '#8E00C2', '#C517B6', '#D90171',
+  '#CD0101', '#F25D2E', '#F2CA33', '#7BD938', '#2ECE9D',
 ];
 
 function runGit(repo: string, ...args: string[]): string {
@@ -115,21 +115,19 @@ function computeLayout(commits: any[]) {
   commits.forEach((c, i) => { index[c.hash] = i; });
 
   const lanes: any[] = [];
-  let colorCounter = 0;
   const edges: any[] = [];
   let maxLanes = 0;
-
-  function nextColor() { return colorCounter++ % PALETTE.length; }
 
   function allocLane(expectedHash: string) {
     for (let i = 0; i < lanes.length; i++) {
       if (lanes[i] === null) {
-        lanes[i] = { hash: expectedHash, color: nextColor() };
+        lanes[i] = { hash: expectedHash, color: i % PALETTE.length };
         return i;
       }
     }
-    lanes.push({ hash: expectedHash, color: nextColor() });
-    return lanes.length - 1;
+    const i = lanes.length;
+    lanes.push({ hash: expectedHash, color: i % PALETTE.length });
+    return i;
   }
 
   for (let row = 0; row < commits.length; row++) {

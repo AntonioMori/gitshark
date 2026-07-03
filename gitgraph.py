@@ -33,10 +33,10 @@ FIELD_SEP = "\x1f"
 RECORD_SEP = "\x1e"
 MAX_COMMITS_DEFAULT = 500
 
-# Paleta de cores das lanes (inspirada no GitKraken)
+# Paleta de cores das lanes (extraída do GitKraken — hue wheel de 10 cores)
 PALETTE = [
-    "#00bcd4", "#b158e0", "#ec4899", "#4f8ff7", "#34d399", "#f5a623",
-    "#ef5350", "#e5c122", "#14b8a6", "#f97316", "#8b8ff7", "#7bd148",
+    "#15A0BF", "#0669F7", "#8E00C2", "#C517B6", "#D90171",
+    "#CD0101", "#F25D2E", "#F2CA33", "#7BD938", "#2ECE9D",
 ]
 
 

@@ -1,7 +1,7 @@
 import Box from "@mui/material/Box";
 
 import type { GroupedRef } from "./commit-graph-types";
-import { chipColor, chipColorDark } from "./utils";
+import { chipBg } from "./utils";
 
 // ----------------------------------------------------------------------
 
@@ -22,14 +22,20 @@ const ICON = {
 
 // ----------------------------------------------------------------------
 
-export function RefLabels({ groups }: { groups: GroupedRef[] }) {
+export function RefLabels({
+  groups,
+  laneColor,
+}: {
+  groups: GroupedRef[];
+  laneColor: string;
+}) {
   if (groups.length === 0) return <div />;
 
   const primary = groups[0];
   const overflow = groups.slice(1);
   const hasOverflow = overflow.length > 0;
-  const bg = chipColor(primary);
-  const bgDark = chipColorDark(primary);
+  const bg = chipBg(laneColor, 0.22);
+  const bgDark = chipBg(laneColor, 0.14);
 
   return (
     <Box
@@ -46,7 +52,7 @@ export function RefLabels({ groups }: { groups: GroupedRef[] }) {
           : undefined,
       }}
     >
-      <RefChip group={primary} />
+      <RefChip group={primary} laneColor={laneColor} />
 
       {hasOverflow && (
         <Box
@@ -87,9 +93,9 @@ export function RefLabels({ groups }: { groups: GroupedRef[] }) {
             overflow: "hidden",
           }}
         >
-          <RefExpandedRow group={primary} isPrimary />
+          <RefExpandedRow group={primary} laneColor={laneColor} isPrimary />
           {overflow.map((g, i) => (
-            <RefExpandedRow key={i} group={g} />
+            <RefExpandedRow key={i} group={g} laneColor={laneColor} />
           ))}
         </Box>
       )}
@@ -99,9 +105,15 @@ export function RefLabels({ groups }: { groups: GroupedRef[] }) {
 
 // ----------------------------------------------------------------------
 
-function RefChip({ group }: { group: GroupedRef }) {
+function RefChip({
+  group,
+  laneColor,
+}: {
+  group: GroupedRef;
+  laneColor: string;
+}) {
   const { ref, remote, isCurrent, isTag } = group;
-  const bg = chipColor(group);
+  const bg = chipBg(laneColor, 0.22);
 
   const rightIcons: string[] = [];
   if (!isTag) {
@@ -153,7 +165,7 @@ function RefChip({ group }: { group: GroupedRef }) {
         component="span"
         sx={{ overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}
       >
-        {ref.name}
+        {ref.name.replace(/^origin\//, "")}
       </Box>
       {rightIcons.map((svg, idx) => (
         <Box
@@ -176,13 +188,15 @@ function RefChip({ group }: { group: GroupedRef }) {
 
 function RefExpandedRow({
   group,
+  laneColor,
   isPrimary,
 }: {
   group: GroupedRef;
+  laneColor: string;
   isPrimary?: boolean;
 }) {
   const { ref, remote, isCurrent, isTag } = group;
-  const bg = chipColor(group);
+  const bg = chipBg(laneColor, 0.22);
 
   let leftIcon: string | null = null;
   if (isCurrent) leftIcon = ICON.check;
@@ -208,8 +222,8 @@ function RefExpandedRow({
         color: "#fff",
         whiteSpace: "nowrap",
         overflow: "hidden",
-        bgcolor: isPrimary ? bg : "#1a3f4a",
-        "&:hover": isPrimary ? undefined : { bgcolor: "#195969" },
+        bgcolor: isPrimary ? bg : chipBg(laneColor, 0.15),
+        "&:hover": isPrimary ? undefined : { bgcolor: chipBg(laneColor, 0.3) },
       }}
     >
       {leftIcon && (
@@ -223,7 +237,7 @@ function RefExpandedRow({
         component="span"
         sx={{ overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}
       >
-        {ref.name}
+        {ref.name.replace(/^origin\//, "")}
       </Box>
       {rightIcons.map((svg, idx) => (
         <Box

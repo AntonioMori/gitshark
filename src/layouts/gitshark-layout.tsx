@@ -16,8 +16,6 @@ import { StatusBar } from 'src/sections/workspace/status-bar';
 // ----------------------------------------------------------------------
 
 const MAX_TABS = 5;
-const HEADER_H = 32 + 28 + 38; // titlebar + menubar + toolbar
-const STATUS_H = 26;
 
 type Tab = {
   payload: RepoPayload;

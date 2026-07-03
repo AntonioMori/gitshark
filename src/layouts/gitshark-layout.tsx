@@ -9,7 +9,7 @@ import { TitleBar } from './title-bar';
 import { MenuBar } from './menu-bar';
 import { Toolbar } from './toolbar';
 import { WelcomeScreen } from 'src/sections/workspace/welcome-screen';
-import { CommitGraph } from 'src/sections/workspace/commit-graph';
+import { CommitGraph } from 'src/sections/workspace/commit-graph/commit-graph';
 import { DetailPanel } from 'src/sections/workspace/detail-panel';
 import { StatusBar } from 'src/sections/workspace/status-bar';
 

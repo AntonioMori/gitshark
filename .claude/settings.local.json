@@ -24,7 +24,9 @@
       "Bash(rm:*)",
       "Bash(taskkill //F //IM electron.exe)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(npx tsc:*)",
+      "Skill(refactor)"
     ]
   }
 }

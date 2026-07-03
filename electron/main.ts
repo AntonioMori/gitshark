@@ -1,0 +1,298 @@
+import { app, BrowserWindow, dialog, ipcMain } from 'electron';
+import path from 'path';
+import { execFileSync } from 'child_process';
+import crypto from 'crypto';
+import fs from 'fs';
+
+// ---------------------------------------------------------------------------
+// Git Engine
+// ---------------------------------------------------------------------------
+
+const FIELD_SEP = '\x1f';
+const RECORD_SEP = '\x1e';
+const MAX_COMMITS = 500;
+
+const PALETTE = [
+  '#00bcd4', '#b158e0', '#ec4899', '#4f8ff7', '#34d399', '#f5a623',
+  '#ef5350', '#e5c122', '#14b8a6', '#f97316', '#8b8ff7', '#7bd148',
+];
+
+function runGit(repo: string, ...args: string[]): string {
+  try {
+    return execFileSync('git', ['-C', repo, ...args], {
+      encoding: 'utf-8',
+      windowsHide: true,
+      maxBuffer: 50 * 1024 * 1024,
+    });
+  } catch (err: any) {
+    throw new Error(err.stderr?.trim() || `git ${args.join(' ')} falhou`);
+  }
+}
+
+function resolveRepoRoot(p: string): string {
+  p = path.resolve(p);
+  if (!fs.existsSync(p) || !fs.statSync(p).isDirectory()) {
+    throw new Error(`'${p}' não é um diretório.`);
+  }
+  try {
+    return runGit(p, 'rev-parse', '--show-toplevel').trim().replace(/\//g, path.sep);
+  } catch {
+    throw new Error(`'${p}' não parece ser um repositório git.`);
+  }
+}
+
+interface Ref {
+  type: string;
+  name: string;
+}
+
+function parseRefs(raw: string): Ref[] {
+  const refs: Ref[] = [];
+  if (!raw) return refs;
+  for (let token of raw.split(', ')) {
+    token = token.trim();
+    if (!token || token.endsWith('/HEAD')) continue;
+    if (token.startsWith('HEAD -> '))
+      refs.push({ type: 'head_branch', name: token.slice(8) });
+    else if (token === 'HEAD')
+      refs.push({ type: 'detached_head', name: 'HEAD' });
+    else if (token.startsWith('tag: '))
+      refs.push({ type: 'tag', name: token.slice(5) });
+    else if (/^(origin|upstream|refs\/remotes)\//.test(token))
+      refs.push({ type: 'remote', name: token });
+    else refs.push({ type: 'branch', name: token });
+  }
+  return refs;
+}
+
+function collectRepoData(repo: string, maxCommits: number) {
+  const fmt =
+    ['%H', '%h', '%P', '%an', '%ae', '%aI', '%D', '%s'].join(FIELD_SEP) +
+    RECORD_SEP;
+
+  const raw = runGit(
+    repo, 'log', '--all', '--topo-order',
+    `--max-count=${maxCommits}`, `--pretty=format:${fmt}`,
+  );
+
+  const commits: any[] = [];
+  for (let record of raw.split(RECORD_SEP)) {
+    record = record.replace(/^[\n\r ]+|[\n\r ]+$/g, '');
+    if (!record) continue;
+    const parts = record.split(FIELD_SEP);
+    if (parts.length < 8) continue;
+    const [full, short, parents, author, email, date, refsRaw, subject] = parts;
+    commits.push({
+      hash: full, short, parents: parents ? parents.split(' ') : [],
+      author, email, date, refs: parseRefs(refsRaw), subject,
+    });
+  }
+
+  let currentBranch = 'HEAD';
+  try { currentBranch = runGit(repo, 'rev-parse', '--abbrev-ref', 'HEAD').trim(); } catch {}
+
+  let headHash: string | null = null;
+  try { headHash = runGit(repo, 'rev-parse', 'HEAD').trim(); } catch {}
+
+  const wip: any = { modified: 0, added: 0, deleted: 0, untracked: 0 };
+  try {
+    for (const line of runGit(repo, 'status', '--porcelain').split('\n')) {
+      if (!line) continue;
+      const code = line.slice(0, 2);
+      if (code.startsWith('??')) wip.untracked++;
+      else if (code.includes('D')) wip.deleted++;
+      else if (code.includes('A')) wip.added++;
+      else wip.modified++;
+    }
+  } catch {}
+  wip.total = wip.modified + wip.added + wip.deleted + wip.untracked;
+
+  return { commits, currentBranch, headHash, wip, repoName: path.basename(repo) };
+}
+
+function computeLayout(commits: any[]) {
+  const index: Record<string, number> = {};
+  commits.forEach((c, i) => { index[c.hash] = i; });
+
+  const lanes: any[] = [];
+  let colorCounter = 0;
+  const edges: any[] = [];
+  let maxLanes = 0;
+
+  function nextColor() { return colorCounter++ % PALETTE.length; }
+
+  function allocLane(expectedHash: string) {
+    for (let i = 0; i < lanes.length; i++) {
+      if (lanes[i] === null) {
+        lanes[i] = { hash: expectedHash, color: nextColor() };
+        return i;
+      }
+    }
+    lanes.push({ hash: expectedHash, color: nextColor() });
+    return lanes.length - 1;
+  }
+
+  for (let row = 0; row < commits.length; row++) {
+    const c = commits[row];
+    let matches = lanes
+      .map((l: any, i: number) => (l && l.hash === c.hash ? i : -1))
+      .filter((i: number) => i >= 0);
+
+    let lane: number;
+    if (matches.length > 0) {
+      lane = matches[0];
+    } else {
+      lane = allocLane(c.hash);
+      matches = [lane];
+    }
+
+    c.row = row;
+    c.lane = lane;
+    c.color = lanes[lane].color;
+
+    for (let i = 1; i < matches.length; i++) lanes[matches[i]] = null;
+
+    const parents = c.parents;
+    if (parents.length > 0) {
+      const first = parents[0];
+      lanes[lane].hash = first;
+      if (first in index) {
+        edges.push({
+          childRow: row, childLane: lane,
+          parentHash: first, routeLane: lane, color: lanes[lane].color,
+        });
+      }
+      for (let pi = 1; pi < parents.length; pi++) {
+        const p = parents[pi];
+        if (!(p in index)) continue;
+        const existing = lanes.findIndex((l: any) => l && l.hash === p);
+        const route = existing >= 0 ? existing : allocLane(p);
+        edges.push({
+          childRow: row, childLane: lane,
+          parentHash: p, routeLane: route, color: lanes[route].color,
+        });
+      }
+    } else {
+      lanes[lane] = null;
+    }
+
+    maxLanes = Math.max(maxLanes, lanes.length);
+  }
+
+  const resolved = edges.map((e: any) => {
+    const p = commits[index[e.parentHash]];
+    return {
+      c: [e.childRow, e.childLane],
+      p: [p.row, p.lane],
+      r: e.routeLane,
+      k: e.color,
+    };
+  });
+
+  return { edges: resolved, maxLanes };
+}
+
+function buildPayload(repoPath: string, maxCommits = MAX_COMMITS) {
+  const repo = resolveRepoRoot(repoPath);
+  const { commits, currentBranch, headHash, wip, repoName } =
+    collectRepoData(repo, maxCommits);
+
+  if (commits.length === 0) {
+    throw new Error('Este repositório ainda não tem commits.');
+  }
+
+  const { edges, maxLanes } = computeLayout(commits);
+
+  const slim = commits.map((c: any) => {
+    const words = c.author.split(/\s+/).slice(0, 2);
+    const initials = words.map((w: string) => w[0] || '').join('').toUpperCase() || '?';
+    const avatarHue =
+      parseInt(crypto.createHash('md5').update(c.email).digest('hex'), 16) % 360;
+    return {
+      h: c.hash, s: c.short, a: c.author,
+      i: initials, hu: avatarHue, d: c.date,
+      m: c.subject, r: c.refs, l: c.lane,
+      k: c.color, np: c.parents.length,
+      mg: c.parents.length > 1 ? 1 : 0,
+    };
+  });
+
+  return {
+    repoPath: repo, repoName,
+    currentBranch, headHash,
+    wip, commits: slim, edges,
+    maxLanes, palette: PALETTE,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Electron App
+// ---------------------------------------------------------------------------
+
+let mainWindow: BrowserWindow | null = null;
+
+function createWindow() {
+  mainWindow = new BrowserWindow({
+    width: 1280,
+    height: 820,
+    minWidth: 900,
+    minHeight: 500,
+    title: 'GitShark',
+    frame: false,
+    backgroundColor: '#1a1f24',
+    webPreferences: {
+      preload: path.join(__dirname, '../preload/index.mjs'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+    },
+  });
+
+  if (process.env.ELECTRON_RENDERER_URL) {
+    mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL);
+  } else {
+    mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
+  }
+
+  if (process.argv.includes('--dev')) {
+    mainWindow.webContents.openDevTools();
+  }
+
+  mainWindow.on('closed', () => { mainWindow = null; });
+}
+
+// --- IPC Handlers ---
+
+ipcMain.on('win-minimize', () => mainWindow?.minimize());
+ipcMain.on('win-maximize', () => {
+  if (mainWindow?.isMaximized()) mainWindow.unmaximize();
+  else mainWindow?.maximize();
+});
+ipcMain.on('win-close', () => mainWindow?.close());
+
+ipcMain.handle('pick-folder', async () => {
+  const result = await dialog.showOpenDialog(mainWindow!, {
+    title: 'Selecione a pasta do repositório git',
+    properties: ['openDirectory'],
+  });
+  if (result.canceled) return { cancelled: true };
+  return { path: result.filePaths[0] };
+});
+
+ipcMain.handle('load-repo', (_event, repoPath: string, maxCommits?: number) => {
+  try {
+    return buildPayload(repoPath, maxCommits || MAX_COMMITS);
+  } catch (err: any) {
+    return { error: err.message };
+  }
+});
+
+// --- App lifecycle ---
+
+app.whenReady().then(createWindow);
+
+app.on('window-all-closed', () => { app.quit(); });
+
+app.on('activate', () => {
+  if (BrowserWindow.getAllWindows().length === 0) createWindow();
+});

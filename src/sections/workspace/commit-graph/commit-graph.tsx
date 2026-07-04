@@ -52,7 +52,8 @@ export function CommitGraph({
     const defs: string[] = [];
     const connectors: string[] = [];
     const graph: string[] = [];
-    const CURVE = ROW_H * 0.72;
+    // GitKraken-style: rounded 90° elbows (quarter-circle arcs via Q bezier)
+    const R_MAX = 10;
 
     for (const e of payload.edges) {
       const cR = e.c[0] + off,
@@ -65,30 +66,62 @@ export function CommitGraph({
       const x2 = laneX(pL),
         y2 = rowY(pR);
       const xr = laneX(e.r);
+
       let d: string;
       if (pR - cR === 1) {
-        d =
-          cL === pL
-            ? `M${x1} ${y1} L${x2} ${y2}`
-            : `M${x1} ${y1} C${x1} ${y1 + CURVE} ${x2} ${y2 - CURVE} ${x2} ${y2}`;
+        if (cL === pL) {
+          d = `M${x1} ${y1} L${x2} ${y2}`;
+        } else if (e.r === cL) {
+          // First-parent crossing lanes: vertical down → elbow at parent row → horizontal
+          const dx = x2 - x1;
+          const adx = Math.abs(dx);
+          const sx = dx > 0 ? 1 : -1;
+          const r = Math.min(adx, R_MAX);
+          d = `M${x1} ${y1} L${x1} ${y2 - r}`;
+          d += ` Q${x1} ${y2} ${x1 + sx * r} ${y2}`;
+          if (adx > r) d += ` L${x2} ${y2}`;
+        } else {
+          // Merge edge: horizontal at child row → elbow → vertical down to parent
+          const dx = x2 - x1;
+          const adx = Math.abs(dx);
+          const sx = dx > 0 ? 1 : -1;
+          const r = Math.min(adx, R_MAX);
+          d = `M${x1} ${y1}`;
+          if (adx > r) d += ` L${x2 - sx * r} ${y1}`;
+          d += ` Q${x2} ${y1} ${x2} ${y1 + r}`;
+          if (y2 > y1 + r) d += ` L${x2} ${y2}`;
+        }
       } else {
         d = `M${x1} ${y1}`;
         let curY = y1;
+
         if (e.r !== cL) {
-          const ny = rowY(cR + 1);
-          d += ` C${x1} ${y1 + CURVE} ${xr} ${ny - CURVE} ${xr} ${ny}`;
-          curY = ny;
+          // Top: horizontal at child row → rounded elbow → vertical into routing lane
+          const dx = xr - x1;
+          const adx = Math.abs(dx);
+          const sx = dx > 0 ? 1 : -1;
+          const r = Math.min(adx, R_MAX);
+          if (adx > r) d += ` L${xr - sx * r} ${y1}`;
+          d += ` Q${xr} ${y1} ${xr} ${y1 + r}`;
+          curY = y1 + r;
         }
+
         if (e.r !== pL) {
-          const by = rowY(pR - 1);
-          if (by > curY) d += ` L${xr} ${by}`;
-          d += ` C${xr} ${by + CURVE} ${x2} ${y2 - CURVE} ${x2} ${y2}`;
+          // Bottom: vertical in routing lane → rounded elbow horizontal into parent
+          const dx = x2 - xr;
+          const adx = Math.abs(dx);
+          const sx = dx > 0 ? 1 : -1;
+          const r = Math.min(adx, R_MAX);
+          if (y2 - r > curY) d += ` L${xr} ${y2 - r}`;
+          d += ` Q${xr} ${y2} ${xr + sx * r} ${y2}`;
+          if (adx > r) d += ` L${x2} ${y2}`;
         } else {
-          d += ` L${x2} ${y2}`;
+          if (y2 > curY) d += ` L${x2} ${y2}`;
         }
       }
+      const isCurrentBranch = headCommit && e.k === headCommit.k;
       graph.push(
-        `<path d="${d}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round"/>`,
+        `<path d="${d}" fill="none" stroke="${color}" stroke-width="${isCurrentBranch ? 2.6 : 2}" stroke-linecap="round"/>`,
       );
     }
 

@@ -26,7 +26,9 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(npx tsc:*)",
-      "Skill(refactor)"
+      "Skill(refactor)",
+      "Bash(curl:*)",
+      "Bash(npx esbuild:*)"
     ]
   }
 }

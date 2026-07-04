@@ -118,11 +118,27 @@ function computeLayout(commits: any[]) {
   const edges: any[] = [];
   let maxLanes = 0;
 
-  function allocLane(expectedHash: string) {
-    for (let i = 0; i < lanes.length; i++) {
-      if (lanes[i] === null) {
-        lanes[i] = { hash: expectedHash, color: i % PALETTE.length };
-        return i;
+  function allocLane(expectedHash: string, nearLane?: number) {
+    if (nearLane !== undefined) {
+      // Search outward from nearLane (prefer right, like GitKraken)
+      for (let dist = 1; dist <= lanes.length; dist++) {
+        const right = nearLane + dist;
+        if (right < lanes.length && lanes[right] === null) {
+          lanes[right] = { hash: expectedHash, color: right % PALETTE.length };
+          return right;
+        }
+        const left = nearLane - dist;
+        if (left >= 0 && lanes[left] === null) {
+          lanes[left] = { hash: expectedHash, color: left % PALETTE.length };
+          return left;
+        }
+      }
+    } else {
+      for (let i = 0; i < lanes.length; i++) {
+        if (lanes[i] === null) {
+          lanes[i] = { hash: expectedHash, color: i % PALETTE.length };
+          return i;
+        }
       }
     }
     const i = lanes.length;
@@ -164,7 +180,7 @@ function computeLayout(commits: any[]) {
         const p = parents[pi];
         if (!(p in index)) continue;
         const existing = lanes.findIndex((l: any) => l && l.hash === p);
-        const route = existing >= 0 ? existing : allocLane(p);
+        const route = existing >= 0 ? existing : allocLane(p, lane);
         edges.push({
           childRow: row, childLane: lane,
           parentHash: p, routeLane: route, color: lanes[route].color,
@@ -175,6 +191,8 @@ function computeLayout(commits: any[]) {
     }
 
     maxLanes = Math.max(maxLanes, lanes.length);
+    // Compact: trim trailing null lanes so branches stay closer to lane 0
+    while (lanes.length > 0 && lanes[lanes.length - 1] === null) lanes.pop();
   }
 
   const resolved = edges.map((e: any) => {

@@ -34,7 +34,7 @@ export function RefLabels({
   const primary = groups[0];
   const overflow = groups.slice(1);
   const hasOverflow = overflow.length > 0;
-  const bg = chipBg(laneColor, 0.22);
+  const bg = chipBg(laneColor, 0.25);
   const bgDark = chipBg(laneColor, 0.14);
 
   return (
@@ -113,7 +113,7 @@ function RefChip({
   laneColor: string;
 }) {
   const { ref, remote, isCurrent, isTag } = group;
-  const bg = chipBg(laneColor, 0.22);
+  const bg = chipBg(laneColor, isCurrent ? 0.50 : 0.25);
 
   const rightIcons: string[] = [];
   if (!isTag) {
@@ -196,7 +196,7 @@ function RefExpandedRow({
   isPrimary?: boolean;
 }) {
   const { ref, remote, isCurrent, isTag } = group;
-  const bg = chipBg(laneColor, 0.22);
+  const bg = chipBg(laneColor, isCurrent ? 0.50 : 0.25);
 
   let leftIcon: string | null = null;
   if (isCurrent) leftIcon = ICON.check;

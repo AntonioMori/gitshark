@@ -133,20 +133,6 @@ function computeLayout(commits: any[], currentBranch: string, headHash: string) 
     }
   });
 
-  // Pin active branch HEADs only to col 1 (do not trace the chain)
-  if (currentBranch && currentBranch !== 'main' && currentBranch !== 'master') {
-    commits.forEach((c) => {
-      const isActive = c.refs.some(
-        (r: any) => r.name === currentBranch || r.name.endsWith('/' + currentBranch)
-      );
-      if (isActive) {
-        if (pinnedColumns[c.hash] === undefined) {
-          pinnedColumns[c.hash] = 1;
-        }
-      }
-    });
-  }
-
   // PASS 1: Rough column assignment to determine final columns of all commits
   const pass1Lanes: (string | null)[] = [];
   function allocPass1Lane(hash: string) {
@@ -158,7 +144,7 @@ function computeLayout(commits: any[], currentBranch: string, headHash: string) 
       }
       return col;
     }
-    const startCol = 1;
+    const startCol = 0;
     for (let i = startCol; i < pass1Lanes.length; i++) {
       if (pass1Lanes[i] === null) {
         pass1Lanes[i] = hash;
@@ -255,7 +241,7 @@ function computeLayout(commits: any[], currentBranch: string, headHash: string) 
       }
       return col;
     } else {
-      const start = 1;
+      const start = 0;
       for (let i = start; i < lanes.length; i++) {
         if (lanes[i] === null) {
           lanes[i] = { hash: expectedHash, color: i % PALETTE.length };
@@ -294,26 +280,21 @@ function computeLayout(commits: any[], currentBranch: string, headHash: string) 
       const first = parents[0];
       lanes[lane].hash = first;
 
-      // Lookahead conflict:
-      const p1Winner = pass1Columns[first];
-      if (p1Winner !== undefined && p1Winner !== lane) {
-        lanes[lane] = null;
-      } else {
-        const colsForFirst = [lane];
-        for (let i = 0; i < lanes.length; i++) {
-          if (i !== lane && lanes[i] && lanes[i].hash === first) colsForFirst.push(i);
-        }
-        if (colsForFirst.length > 1) {
-          const winnerCol = p1Winner !== undefined ? p1Winner : Math.min(...colsForFirst);
-          for (const col of colsForFirst) {
-            if (col !== winnerCol) {
-              lanes[col] = null;
-            }
+      // Keep first parent in current lane to keep branches straight (similar to GitKraken)
+      const colsForFirst = [lane];
+      for (let i = 0; i < lanes.length; i++) {
+        if (i !== lane && lanes[i] && lanes[i].hash === first) colsForFirst.push(i);
+      }
+      if (colsForFirst.length > 1) {
+        const winnerCol = Math.min(...colsForFirst);
+        for (const col of colsForFirst) {
+          if (col !== winnerCol) {
+            lanes[col] = null;
           }
         }
       }
 
-      const routeLane = pass1Columns[first] !== undefined ? pass1Columns[first] : lane;
+      const routeLane = lane;
       if (first in index) {
         edges.push({
           childRow: row, childLane: lane,

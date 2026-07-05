@@ -170,6 +170,13 @@ function computeLayout(commits: any[]) {
     if (parents.length > 0) {
       const first = parents[0];
       lanes[lane].hash = first;
+      // Early duplicate cleanup: if another lane already points to this
+      // parent, free it now so secondary parents can reuse that lane
+      for (let i = 0; i < lanes.length; i++) {
+        if (i !== lane && lanes[i] && lanes[i].hash === first) {
+          lanes[i] = null;
+        }
+      }
       if (first in index) {
         edges.push({
           childRow: row, childLane: lane,
@@ -180,7 +187,7 @@ function computeLayout(commits: any[]) {
         const p = parents[pi];
         if (!(p in index)) continue;
         const existing = lanes.findIndex((l: any) => l && l.hash === p);
-        const route = existing >= 0 ? existing : allocLane(p, lane);
+        const route = existing >= 0 ? existing : allocLane(p);
         edges.push({
           childRow: row, childLane: lane,
           parentHash: p, routeLane: route, color: lanes[route].color,

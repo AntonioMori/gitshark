@@ -110,44 +110,167 @@ function collectRepoData(repo: string, maxCommits: number) {
   return { commits, currentBranch, headHash, wip, repoName: path.basename(repo) };
 }
 
-function computeLayout(commits: any[]) {
+function computeLayout(commits: any[], currentBranch: string, headHash: string) {
   const index: Record<string, number> = {};
   commits.forEach((c, i) => { index[c.hash] = i; });
 
+  const pinnedColumns: Record<string, number> = {};
+  
+  // Trace main/master chain to col 0
+  const mainHeads: string[] = [];
+  commits.forEach((c) => {
+    const isMain = c.refs.some(
+      (r: any) => r.name === 'main' || r.name === 'master' || r.name.endsWith('/main') || r.name.endsWith('/master')
+    );
+    if (isMain) mainHeads.push(c.hash);
+  });
+  mainHeads.forEach((h) => {
+    let curr: string | null = h;
+    while (curr && curr in index) {
+      pinnedColumns[curr] = 0;
+      const c = commits[index[curr]];
+      curr = c.parents && c.parents.length > 0 ? c.parents[0] : null;
+    }
+  });
+
+  // Pin active branch HEADs only to col 1 (do not trace the chain)
+  if (currentBranch && currentBranch !== 'main' && currentBranch !== 'master') {
+    commits.forEach((c) => {
+      const isActive = c.refs.some(
+        (r: any) => r.name === currentBranch || r.name.endsWith('/' + currentBranch)
+      );
+      if (isActive) {
+        if (pinnedColumns[c.hash] === undefined) {
+          pinnedColumns[c.hash] = 1;
+        }
+      }
+    });
+  }
+
+  // PASS 1: Rough column assignment to determine final columns of all commits
+  const pass1Lanes: (string | null)[] = [];
+  function allocPass1Lane(hash: string) {
+    if (pinnedColumns[hash] !== undefined) {
+      const col = pinnedColumns[hash];
+      if (pass1Lanes[col] === null || pass1Lanes[col] === undefined) {
+        pass1Lanes[col] = hash;
+        return col;
+      }
+      return col;
+    }
+    const startCol = 1;
+    for (let i = startCol; i < pass1Lanes.length; i++) {
+      if (pass1Lanes[i] === null) {
+        pass1Lanes[i] = hash;
+        return i;
+      }
+    }
+    const i = Math.max(startCol, pass1Lanes.length);
+    while (pass1Lanes.length < i) pass1Lanes.push(null);
+    pass1Lanes[i] = hash;
+    return i;
+  }
+
+  const tempCommits = JSON.parse(JSON.stringify(commits));
+  for (let row = 0; row < tempCommits.length; row++) {
+    const c = tempCommits[row];
+    c.row = row;
+    let lane = pass1Lanes.indexOf(c.hash);
+    if (lane < 0) {
+      lane = allocPass1Lane(c.hash);
+    }
+    c.lane = lane;
+    pass1Lanes[lane] = null;
+    const parents = c.parents;
+    if (parents.length > 0) {
+      const first = parents[0];
+      pass1Lanes[lane] = first;
+
+      const colsForFirst = [lane];
+      for (let i = 0; i < pass1Lanes.length; i++) {
+        if (i !== lane && pass1Lanes[i] && pass1Lanes[i] === first) colsForFirst.push(i);
+      }
+
+      if (colsForFirst.length > 1) {
+        let winnerCol: number;
+        if (pinnedColumns[first] !== undefined && colsForFirst.includes(pinnedColumns[first])) {
+          winnerCol = pinnedColumns[first];
+        } else {
+          // Resolve conflict in Pass 1 using "more commits wins"
+          const childRows = colsForFirst.map(col => {
+            const child = tempCommits.slice(0, row).reverse().find((lc: any) => lc.lane === col && lc.parents.includes(first));
+            return child ? child.row : row;
+          });
+          const minRow = Math.min(...childRows);
+          
+          winnerCol = colsForFirst[0];
+          let maxCommits = -1;
+          for (const col of colsForFirst) {
+            let count = 0;
+            for (let r = minRow; r < row; r++) {
+              if (tempCommits[r].lane === col) count++;
+            }
+            if (count > maxCommits) {
+              maxCommits = count;
+              winnerCol = col;
+            } else if (count === maxCommits) {
+              if (col < winnerCol) winnerCol = col;
+            }
+          }
+        }
+
+        // Keep only winnerCol
+        pass1Lanes[winnerCol] = first;
+        for (const col of colsForFirst) {
+          if (col !== winnerCol) pass1Lanes[col] = null;
+        }
+      }
+
+      for (let pi = 1; pi < parents.length; pi++) {
+        const p = parents[pi];
+        if (p in index) {
+          const route = pass1Lanes.indexOf(p);
+          if (route < 0) {
+            allocPass1Lane(p);
+          }
+        }
+      }
+    }
+  }
+
+  const pass1Columns: Record<string, number> = {};
+  tempCommits.forEach((c: any) => { pass1Columns[c.hash] = c.lane; });
+
+  // PASS 2: Real layout computation
   const lanes: any[] = [];
   const edges: any[] = [];
   let maxLanes = 0;
 
-  function allocLane(expectedHash: string, nearLane?: number) {
-    if (nearLane !== undefined) {
-      // Search outward from nearLane (prefer right, like GitKraken)
-      for (let dist = 1; dist <= lanes.length; dist++) {
-        const right = nearLane + dist;
-        if (right < lanes.length && lanes[right] === null) {
-          lanes[right] = { hash: expectedHash, color: right % PALETTE.length };
-          return right;
-        }
-        const left = nearLane - dist;
-        if (left >= 0 && lanes[left] === null) {
-          lanes[left] = { hash: expectedHash, color: left % PALETTE.length };
-          return left;
-        }
+  function allocLane(expectedHash: string) {
+    if (pinnedColumns[expectedHash] !== undefined) {
+      const col = pinnedColumns[expectedHash];
+      if (lanes[col] === null || lanes[col] === undefined) {
+        lanes[col] = { hash: expectedHash, color: col % PALETTE.length };
+        return col;
       }
+      return col;
     } else {
-      for (let i = 0; i < lanes.length; i++) {
+      const start = 1;
+      for (let i = start; i < lanes.length; i++) {
         if (lanes[i] === null) {
           lanes[i] = { hash: expectedHash, color: i % PALETTE.length };
           return i;
         }
       }
+      const i = lanes.length;
+      lanes.push({ hash: expectedHash, color: i % PALETTE.length });
+      return i;
     }
-    const i = lanes.length;
-    lanes.push({ hash: expectedHash, color: i % PALETTE.length });
-    return i;
   }
 
   for (let row = 0; row < commits.length; row++) {
     const c = commits[row];
+
     let matches = lanes
       .map((l: any, i: number) => (l && l.hash === c.hash ? i : -1))
       .filter((i: number) => i >= 0);
@@ -170,17 +293,31 @@ function computeLayout(commits: any[]) {
     if (parents.length > 0) {
       const first = parents[0];
       lanes[lane].hash = first;
-      // Early duplicate cleanup: if another lane already points to this
-      // parent, free it now so secondary parents can reuse that lane
-      for (let i = 0; i < lanes.length; i++) {
-        if (i !== lane && lanes[i] && lanes[i].hash === first) {
-          lanes[i] = null;
+
+      // Lookahead conflict:
+      const p1Winner = pass1Columns[first];
+      if (p1Winner !== undefined && p1Winner !== lane) {
+        lanes[lane] = null;
+      } else {
+        const colsForFirst = [lane];
+        for (let i = 0; i < lanes.length; i++) {
+          if (i !== lane && lanes[i] && lanes[i].hash === first) colsForFirst.push(i);
+        }
+        if (colsForFirst.length > 1) {
+          const winnerCol = p1Winner !== undefined ? p1Winner : Math.min(...colsForFirst);
+          for (const col of colsForFirst) {
+            if (col !== winnerCol) {
+              lanes[col] = null;
+            }
+          }
         }
       }
+
+      const routeLane = pass1Columns[first] !== undefined ? pass1Columns[first] : lane;
       if (first in index) {
         edges.push({
           childRow: row, childLane: lane,
-          parentHash: first, routeLane: lane, color: lanes[lane].color,
+          parentHash: first, routeLane, color: lanes[routeLane]?.color ?? (routeLane % PALETTE.length),
         });
       }
       for (let pi = 1; pi < parents.length; pi++) {
@@ -198,7 +335,6 @@ function computeLayout(commits: any[]) {
     }
 
     maxLanes = Math.max(maxLanes, lanes.length);
-    // Compact: trim trailing null lanes so branches stay closer to lane 0
     while (lanes.length > 0 && lanes[lanes.length - 1] === null) lanes.pop();
   }
 
@@ -353,7 +489,7 @@ async function buildPayload(repoPath: string, maxCommits = MAX_COMMITS) {
     throw new Error('Este repositório ainda não tem commits.');
   }
 
-  const { edges, maxLanes } = computeLayout(commits);
+  const { edges, maxLanes } = computeLayout(commits, currentBranch, headHash);
 
   const slim = commits.map((c: any) => {
     const words = c.author.split(/\s+/).slice(0, 2);

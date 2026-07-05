@@ -263,7 +263,7 @@ export function CommitGraph({
             position: "relative",
             display: "flex",
             flexDirection: "column",
-            gap: "6px",
+            gap: "4px",
           }}
           onClick={handleRowClick}
         >

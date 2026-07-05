@@ -32,12 +32,12 @@ export function Toolbar({
   return (
     <Box
       sx={{
-        height: 38,
+        height: 34,
         display: "flex",
         alignItems: "center",
         px: 1,
         gap: "2px",
-        bgcolor: "background.paper",
+        bgcolor: "#2a2d34",
         borderBottom: "1px solid",
         borderColor: "divider",
         userSelect: "none",
@@ -204,17 +204,17 @@ function TabChip({ label, active, color, onClick, onClose }: TabChipProps) {
         alignItems: "center",
         gap: 1,
         maxWidth: 200,
-        height: 26,
+        height: "100%",
+        alignSelf: "stretch",
         px: "14px",
-        bgcolor: active ? "#353c42" : "#2d3439",
-        borderBottom: active ? "2px solid" : "2px solid transparent",
-        borderBottomColor: active ? "primary.main" : "transparent",
+        bgcolor: active ? "#33373f" : "transparent",
         borderRadius: "4px 4px 0 0",
         color: active ? "text.primary" : "text.secondary",
         fontSize: 12,
         fontWeight: 500,
         cursor: "pointer",
-        "&:hover": { bgcolor: "#353c42", color: "text.primary" },
+        "& :hover": { color: "text.primary" },
+        "&:hover": { bgcolor: active ? "#33373f" : "#32363e", color: "text.primary" },
       }}
     >
       {color && (

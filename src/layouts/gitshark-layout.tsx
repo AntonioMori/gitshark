@@ -8,6 +8,7 @@ import type { RepoPayload } from 'src/types/electron';
 import { TitleBar } from './title-bar';
 import { MenuBar } from './menu-bar';
 import { Toolbar } from './toolbar';
+import { ActionBar } from './action-bar';
 import { WelcomeScreen } from 'src/sections/workspace/welcome-screen';
 import { CommitGraph } from 'src/sections/workspace/commit-graph/commit-graph';
 import { DetailPanel } from 'src/sections/workspace/detail-panel';
@@ -126,6 +127,7 @@ export function GitSharkLayout() {
         onActivateTab={activateTab}
         onCloseTab={closeTab}
       />
+      {activePayload && <ActionBar payload={activePayload} />}
 
       {/* Workspace */}
       <Box sx={{ flex: 1, position: 'relative', overflow: 'hidden' }}>

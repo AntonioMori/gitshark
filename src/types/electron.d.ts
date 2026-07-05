@@ -17,6 +17,7 @@ export interface SlimCommit {
   a: string;   // author
   i: string;   // initials
   hu: number;  // avatar hue
+  g: string;   // gravatar MD5 hash
   d: string;   // date ISO
   m: string;   // message/subject
   r: RepoRef[];
@@ -51,6 +52,7 @@ export interface RepoPayload {
   edges: Edge[];
   maxLanes: number;
   palette: string[];
+  avatars: Record<string, string>; // md5 → data:image URL
 }
 
 declare global {

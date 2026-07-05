@@ -1,0 +1,34 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(npx electron:*)",
+      "Bash(npm start:*)",
+      "Read(//c/Users/ITEMM/Desktop/Projetos/MINIMAL/24-06-2026/template/Minimal_TypeScript_v7.7.0 2/starter-vite-ts/**)",
+      "Bash(du -sh * --exclude=node_modules)",
+      "Bash(mkdir:*)",
+      "Bash(cp:*)",
+      "Bash(cp 'c:/Users/ITEMM/Desktop/Projetos/MINIMAL/24-06-2026/template/Minimal_TypeScript_v7.7.0    2/starter-vite-ts/src/global.css' C:/Users/ITEMM/Desktop/repositorios/gitshark/src/global.css)",
+      "Bash(cp 'c:/Users/ITEMM/Desktop/Projetos/MINIMAL/24-06-2026/template/Minimal_TypeScript_v7.7.0    2/starter-vite-ts/src/global-config.ts' C:/Users/ITEMM/Desktop/repositorios/gitshark/src/global-config.ts)",
+      "Bash(cp 'c:/Users/ITEMM/Desktop/Projetos/MINIMAL/24-06-2026/template/Minimal_TypeScript_v7.7.0    2/starter-vite-ts/src/vite-env.d.ts' C:/Users/ITEMM/Desktop/repositorios/gitshark/src/vite-env.d.ts)",
+      "Bash(cp -r 'c:/Users/ITEMM/Desktop/Projetos/MINIMAL/24-06-2026/template/Minimal_TypeScript_v7.7.0    2/starter-vite-ts/src/utils' C:/Users/ITEMM/Desktop/repositorios/gitshark/src/utils)",
+      "Bash(cp -r 'c:/Users/ITEMM/Desktop/Projetos/MINIMAL/24-06-2026/template/Minimal_TypeScript_v7.7.0    2/starter-vite-ts/src/assets' C:/Users/ITEMM/Desktop/repositorios/gitshark/src/assets)",
+      "Bash(rm -rf theme/with-settings)",
+      "Bash(rm -rf components/animate/back-to-top-button.tsx)",
+      "Bash(rm -rf components/animate/scroll-progress)",
+      "Bash(rm -rf assets/data)",
+      "Bash(rm -f main.js preload.js)",
+      "Bash(rm -f package-lock.json)",
+      "Bash(npm view:*)",
+      "Bash(npx electron-vite:*)",
+      "Bash(rm:*)",
+      "Bash(taskkill //F //IM electron.exe)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(npx tsc:*)",
+      "Skill(refactor)",
+      "Bash(curl:*)",
+      "Bash(npx esbuild:*)"
+    ]
+  }
+}

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, net } from 'electron';
 import path from 'path';
 import { execFileSync } from 'child_process';
 import crypto from 'crypto';
@@ -13,8 +13,8 @@ const RECORD_SEP = '\x1e';
 const MAX_COMMITS = 500;
 
 const PALETTE = [
-  '#00bcd4', '#b158e0', '#ec4899', '#4f8ff7', '#34d399', '#f5a623',
-  '#ef5350', '#e5c122', '#14b8a6', '#f97316', '#8b8ff7', '#7bd148',
+  '#15A0BF', '#0669F7', '#8E00C2', '#C517B6', '#D90171',
+  '#CD0101', '#F25D2E', '#F2CA33', '#7BD938', '#2ECE9D',
 ];
 
 function runGit(repo: string, ...args: string[]): string {
@@ -110,30 +110,167 @@ function collectRepoData(repo: string, maxCommits: number) {
   return { commits, currentBranch, headHash, wip, repoName: path.basename(repo) };
 }
 
-function computeLayout(commits: any[]) {
+function computeLayout(commits: any[], currentBranch: string, headHash: string) {
   const index: Record<string, number> = {};
   commits.forEach((c, i) => { index[c.hash] = i; });
 
-  const lanes: any[] = [];
-  let colorCounter = 0;
-  const edges: any[] = [];
-  let maxLanes = 0;
+  const pinnedColumns: Record<string, number> = {};
+  
+  // Trace main/master chain to col 0
+  const mainHeads: string[] = [];
+  commits.forEach((c) => {
+    const isMain = c.refs.some(
+      (r: any) => r.name === 'main' || r.name === 'master' || r.name.endsWith('/main') || r.name.endsWith('/master')
+    );
+    if (isMain) mainHeads.push(c.hash);
+  });
+  mainHeads.forEach((h) => {
+    let curr: string | null = h;
+    while (curr && curr in index) {
+      pinnedColumns[curr] = 0;
+      const c = commits[index[curr]];
+      curr = c.parents && c.parents.length > 0 ? c.parents[0] : null;
+    }
+  });
 
-  function nextColor() { return colorCounter++ % PALETTE.length; }
+  // Pin active branch HEADs only to col 1 (do not trace the chain)
+  if (currentBranch && currentBranch !== 'main' && currentBranch !== 'master') {
+    commits.forEach((c) => {
+      const isActive = c.refs.some(
+        (r: any) => r.name === currentBranch || r.name.endsWith('/' + currentBranch)
+      );
+      if (isActive) {
+        if (pinnedColumns[c.hash] === undefined) {
+          pinnedColumns[c.hash] = 1;
+        }
+      }
+    });
+  }
 
-  function allocLane(expectedHash: string) {
-    for (let i = 0; i < lanes.length; i++) {
-      if (lanes[i] === null) {
-        lanes[i] = { hash: expectedHash, color: nextColor() };
+  // PASS 1: Rough column assignment to determine final columns of all commits
+  const pass1Lanes: (string | null)[] = [];
+  function allocPass1Lane(hash: string) {
+    if (pinnedColumns[hash] !== undefined) {
+      const col = pinnedColumns[hash];
+      if (pass1Lanes[col] === null || pass1Lanes[col] === undefined) {
+        pass1Lanes[col] = hash;
+        return col;
+      }
+      return col;
+    }
+    const startCol = 1;
+    for (let i = startCol; i < pass1Lanes.length; i++) {
+      if (pass1Lanes[i] === null) {
+        pass1Lanes[i] = hash;
         return i;
       }
     }
-    lanes.push({ hash: expectedHash, color: nextColor() });
-    return lanes.length - 1;
+    const i = Math.max(startCol, pass1Lanes.length);
+    while (pass1Lanes.length < i) pass1Lanes.push(null);
+    pass1Lanes[i] = hash;
+    return i;
+  }
+
+  const tempCommits = JSON.parse(JSON.stringify(commits));
+  for (let row = 0; row < tempCommits.length; row++) {
+    const c = tempCommits[row];
+    c.row = row;
+    let lane = pass1Lanes.indexOf(c.hash);
+    if (lane < 0) {
+      lane = allocPass1Lane(c.hash);
+    }
+    c.lane = lane;
+    pass1Lanes[lane] = null;
+    const parents = c.parents;
+    if (parents.length > 0) {
+      const first = parents[0];
+      pass1Lanes[lane] = first;
+
+      const colsForFirst = [lane];
+      for (let i = 0; i < pass1Lanes.length; i++) {
+        if (i !== lane && pass1Lanes[i] && pass1Lanes[i] === first) colsForFirst.push(i);
+      }
+
+      if (colsForFirst.length > 1) {
+        let winnerCol: number;
+        if (pinnedColumns[first] !== undefined && colsForFirst.includes(pinnedColumns[first])) {
+          winnerCol = pinnedColumns[first];
+        } else {
+          // Resolve conflict in Pass 1 using "more commits wins"
+          const childRows = colsForFirst.map(col => {
+            const child = tempCommits.slice(0, row).reverse().find((lc: any) => lc.lane === col && lc.parents.includes(first));
+            return child ? child.row : row;
+          });
+          const minRow = Math.min(...childRows);
+          
+          winnerCol = colsForFirst[0];
+          let maxCommits = -1;
+          for (const col of colsForFirst) {
+            let count = 0;
+            for (let r = minRow; r < row; r++) {
+              if (tempCommits[r].lane === col) count++;
+            }
+            if (count > maxCommits) {
+              maxCommits = count;
+              winnerCol = col;
+            } else if (count === maxCommits) {
+              if (col < winnerCol) winnerCol = col;
+            }
+          }
+        }
+
+        // Keep only winnerCol
+        pass1Lanes[winnerCol] = first;
+        for (const col of colsForFirst) {
+          if (col !== winnerCol) pass1Lanes[col] = null;
+        }
+      }
+
+      for (let pi = 1; pi < parents.length; pi++) {
+        const p = parents[pi];
+        if (p in index) {
+          const route = pass1Lanes.indexOf(p);
+          if (route < 0) {
+            allocPass1Lane(p);
+          }
+        }
+      }
+    }
+  }
+
+  const pass1Columns: Record<string, number> = {};
+  tempCommits.forEach((c: any) => { pass1Columns[c.hash] = c.lane; });
+
+  // PASS 2: Real layout computation
+  const lanes: any[] = [];
+  const edges: any[] = [];
+  let maxLanes = 0;
+
+  function allocLane(expectedHash: string) {
+    if (pinnedColumns[expectedHash] !== undefined) {
+      const col = pinnedColumns[expectedHash];
+      if (lanes[col] === null || lanes[col] === undefined) {
+        lanes[col] = { hash: expectedHash, color: col % PALETTE.length };
+        return col;
+      }
+      return col;
+    } else {
+      const start = 1;
+      for (let i = start; i < lanes.length; i++) {
+        if (lanes[i] === null) {
+          lanes[i] = { hash: expectedHash, color: i % PALETTE.length };
+          return i;
+        }
+      }
+      const i = lanes.length;
+      lanes.push({ hash: expectedHash, color: i % PALETTE.length });
+      return i;
+    }
   }
 
   for (let row = 0; row < commits.length; row++) {
     const c = commits[row];
+
     let matches = lanes
       .map((l: any, i: number) => (l && l.hash === c.hash ? i : -1))
       .filter((i: number) => i >= 0);
@@ -156,10 +293,31 @@ function computeLayout(commits: any[]) {
     if (parents.length > 0) {
       const first = parents[0];
       lanes[lane].hash = first;
+
+      // Lookahead conflict:
+      const p1Winner = pass1Columns[first];
+      if (p1Winner !== undefined && p1Winner !== lane) {
+        lanes[lane] = null;
+      } else {
+        const colsForFirst = [lane];
+        for (let i = 0; i < lanes.length; i++) {
+          if (i !== lane && lanes[i] && lanes[i].hash === first) colsForFirst.push(i);
+        }
+        if (colsForFirst.length > 1) {
+          const winnerCol = p1Winner !== undefined ? p1Winner : Math.min(...colsForFirst);
+          for (const col of colsForFirst) {
+            if (col !== winnerCol) {
+              lanes[col] = null;
+            }
+          }
+        }
+      }
+
+      const routeLane = pass1Columns[first] !== undefined ? pass1Columns[first] : lane;
       if (first in index) {
         edges.push({
           childRow: row, childLane: lane,
-          parentHash: first, routeLane: lane, color: lanes[lane].color,
+          parentHash: first, routeLane, color: lanes[routeLane]?.color ?? (routeLane % PALETTE.length),
         });
       }
       for (let pi = 1; pi < parents.length; pi++) {
@@ -177,6 +335,7 @@ function computeLayout(commits: any[]) {
     }
 
     maxLanes = Math.max(maxLanes, lanes.length);
+    while (lanes.length > 0 && lanes[lanes.length - 1] === null) lanes.pop();
   }
 
   const resolved = edges.map((e: any) => {
@@ -192,7 +351,136 @@ function computeLayout(commits: any[]) {
   return { edges: resolved, maxLanes };
 }
 
-function buildPayload(repoPath: string, maxCommits = MAX_COMMITS) {
+// ---------------------------------------------------------------------------
+// Avatar cache (GitHub)
+// ---------------------------------------------------------------------------
+
+const avatarCache = new Map<string, string>(); // email → data:image/...
+
+function parseGitHubRemote(repo: string): string | null {
+  try {
+    const remote = runGit(repo, 'remote', 'get-url', 'origin').trim();
+    const m = remote.match(/github\.com[:/]([^/]+\/[^/.]+)/);
+    return m ? m[1].replace(/\.git$/, '') : null;
+  } catch { return null; }
+}
+
+async function downloadAvatar(url: string): Promise<string> {
+  const imgRes = await net.fetch(url, { signal: AbortSignal.timeout(4000) });
+  if (!imgRes.ok) return '';
+  const buf = Buffer.from(await imgRes.arrayBuffer());
+  const ct = imgRes.headers.get('content-type') || 'image/png';
+  return `data:${ct};base64,${buf.toString('base64')}`;
+}
+
+async function fetchAvatarsFromGitHub(
+  repoSlug: string,
+  emails: string[],
+): Promise<Map<string, string>> {
+  const result = new Map<string, string>();
+  const pending = new Set(emails);
+  try {
+    // Fetch enough pages to cover all unique emails
+    const res = await net.fetch(
+      `https://api.github.com/repos/${repoSlug}/commits?per_page=100`,
+      { signal: AbortSignal.timeout(8000), headers: { 'User-Agent': 'GitShark' } },
+    );
+    if (!res.ok) return result;
+    const data: any[] = await res.json();
+
+    for (const item of data) {
+      const email = item.commit?.author?.email?.trim().toLowerCase();
+      if (!email || !pending.has(email)) continue;
+      const avatarUrl = item.author?.avatar_url;
+      if (!avatarUrl) continue;
+      result.set(email, avatarUrl);
+      pending.delete(email);
+      if (pending.size === 0) break;
+    }
+  } catch {}
+  return result;
+}
+
+async function fetchAvatars(
+  commits: { author: string; email: string; g: string }[],
+  repoPath: string,
+): Promise<Record<string, string>> {
+  // Collect unique emails and map email → hashes
+  const emailToHashes = new Map<string, string[]>();
+  for (const c of commits) {
+    const email = c.email.trim().toLowerCase();
+    if (!emailToHashes.has(email)) emailToHashes.set(email, []);
+    const arr = emailToHashes.get(email)!;
+    if (!arr.includes(c.g)) arr.push(c.g);
+  }
+
+  const uniqueEmails = [...emailToHashes.keys()];
+  const emailAvatars = new Map<string, string>();
+
+  // 1. Check cache first
+  const uncached: string[] = [];
+  for (const email of uniqueEmails) {
+    if (avatarCache.has(email)) emailAvatars.set(email, avatarCache.get(email)!);
+    else uncached.push(email);
+  }
+
+  // 2. For uncached: resolve avatar URLs via GitHub repo commits API
+  if (uncached.length > 0) {
+    const slug = parseGitHubRemote(repoPath);
+    const avatarUrls = slug
+      ? await fetchAvatarsFromGitHub(slug, uncached)
+      : new Map<string, string>();
+
+    // 3. Handle noreply emails as fallback
+    for (const email of uncached) {
+      if (avatarUrls.has(email)) continue;
+      const m = email.match(/^(?:\d+\+)?([^@]+)@users\.noreply\.github\.com$/);
+      if (m) avatarUrls.set(email, `https://avatars.githubusercontent.com/${m[1]}?s=64`);
+    }
+
+    // 4. Download images in parallel and cache
+    await Promise.all(
+      uncached.map(async (email) => {
+        const url = avatarUrls.get(email);
+        if (!url) { avatarCache.set(email, ''); return; }
+        const dataUrl = await downloadAvatar(`${url}${url.includes('?') ? '&' : '?'}s=64`);
+        avatarCache.set(email, dataUrl);
+        emailAvatars.set(email, dataUrl);
+      }),
+    );
+  }
+
+  // Build author → emails groups (same person may use different emails)
+  const byAuthor = new Map<string, Set<string>>();
+  for (const c of commits) {
+    const name = c.author.trim().toLowerCase();
+    if (!byAuthor.has(name)) byAuthor.set(name, new Set());
+    byAuthor.get(name)!.add(c.email.trim().toLowerCase());
+  }
+
+  // For each author, find the best avatar across all their emails
+  const bestByEmail = new Map<string, string>();
+  for (const emails of byAuthor.values()) {
+    let bestUrl = '';
+    for (const e of emails) {
+      const url = emailAvatars.get(e) || '';
+      if (url) { bestUrl = url; break; }
+    }
+    if (bestUrl) for (const e of emails) bestByEmail.set(e, bestUrl);
+  }
+
+  // Map hash → data URL
+  const out: Record<string, string> = {};
+  for (const [email, hashes] of emailToHashes) {
+    const url = bestByEmail.get(email) || emailAvatars.get(email) || '';
+    if (url) for (const h of hashes) out[h] = url;
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+
+async function buildPayload(repoPath: string, maxCommits = MAX_COMMITS) {
   const repo = resolveRepoRoot(repoPath);
   const { commits, currentBranch, headHash, wip, repoName } =
     collectRepoData(repo, maxCommits);
@@ -201,27 +489,32 @@ function buildPayload(repoPath: string, maxCommits = MAX_COMMITS) {
     throw new Error('Este repositório ainda não tem commits.');
   }
 
-  const { edges, maxLanes } = computeLayout(commits);
+  const { edges, maxLanes } = computeLayout(commits, currentBranch, headHash);
 
   const slim = commits.map((c: any) => {
     const words = c.author.split(/\s+/).slice(0, 2);
     const initials = words.map((w: string) => w[0] || '').join('').toUpperCase() || '?';
-    const avatarHue =
-      parseInt(crypto.createHash('md5').update(c.email).digest('hex'), 16) % 360;
+    const emailHash = crypto.createHash('md5').update(c.email.trim().toLowerCase()).digest('hex');
+    const avatarHue = parseInt(emailHash, 16) % 360;
     return {
       h: c.hash, s: c.short, a: c.author,
-      i: initials, hu: avatarHue, d: c.date,
+      i: initials, hu: avatarHue, g: emailHash, d: c.date,
       m: c.subject, r: c.refs, l: c.lane,
       k: c.color, np: c.parents.length,
       mg: c.parents.length > 1 ? 1 : 0,
     };
   });
 
+  const avatarInput = commits.map((c: any, i: number) => ({
+    author: c.author, email: c.email, g: slim[i].g,
+  }));
+  const avatars = await fetchAvatars(avatarInput, repo);
+
   return {
     repoPath: repo, repoName,
     currentBranch, headHash,
     wip, commits: slim, edges,
-    maxLanes, palette: PALETTE,
+    maxLanes, palette: PALETTE, avatars,
   };
 }
 
@@ -279,9 +572,9 @@ ipcMain.handle('pick-folder', async () => {
   return { path: result.filePaths[0] };
 });
 
-ipcMain.handle('load-repo', (_event, repoPath: string, maxCommits?: number) => {
+ipcMain.handle('load-repo', async (_event, repoPath: string, maxCommits?: number) => {
   try {
-    return buildPayload(repoPath, maxCommits || MAX_COMMITS);
+    return await buildPayload(repoPath, maxCommits || MAX_COMMITS);
   } catch (err: any) {
     return { error: err.message };
   }

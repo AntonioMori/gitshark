@@ -1,3 +1,4 @@
+
 # GitGraph — Graph de commits estilo GitKraken
 
 App local e gratuito para visualizar o histórico de repositórios git com o layout do GitKraken: **branches/tags à esquerda, grafo colorido no meio, mensagem do commit à direita** — agora com **abas para até 5 repositórios** e botão para abrir pastas pelo **Explorador de Arquivos do Windows**.

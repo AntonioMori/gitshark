@@ -232,7 +232,7 @@ export function CommitGraph({
           bgcolor: "background.paper",
           borderBottom: "1px solid",
           borderColor: "divider",
-          fontSize: 10.5,
+          fontSize: 9.5,
           letterSpacing: "0.08em",
           color: "text.secondary",
           textTransform: "uppercase",
@@ -362,11 +362,11 @@ export function CommitGraph({
                     sx={{
                       overflow: "hidden",
                       textOverflow: "ellipsis",
-                      color: "#b1b3ba",
-                      fontSize: 12.5,
+                      color: "#bdbec3",
+                      fontSize: 13,
                       fontWeight: 500,
                       fontFamily: FONT,
-                      ...(c.mg && { opacity: 0.65 }),
+                      ...(c.mg && { opacity: 0.8 }),
                     }}
                     title={c.m}
                   >

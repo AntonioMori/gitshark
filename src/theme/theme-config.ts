@@ -83,7 +83,7 @@ export const themeConfig: ThemeConfig = {
       main: '#FFAB00',
       dark: '#B76E00',
       darker: '#7A4100',
-      contrastText: '#1C252E',
+      contrastText: '#272A31',
     },
     error: {
       lighter: '#FFE9D5',
@@ -102,7 +102,7 @@ export const themeConfig: ThemeConfig = {
       500: '#919EAB',
       600: '#637381',
       700: '#454F5B',
-      800: '#1C252E',
+      800: '#272A31',
       900: '#1C1E23',
     },
     common: {

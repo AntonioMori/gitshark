@@ -1,13 +1,42 @@
-import React from "react";
+import React, { useState, useRef } from "react";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
-import type { RepoPayload } from "src/types/electron";
+import Popover from "@mui/material/Popover";
+import CircularProgress from "@mui/material/CircularProgress";
+import { Iconify } from "src/components/iconify";
+import type { RepoPayload, PullMode } from "src/types/electron";
 
 interface ActionBarProps {
   payload: RepoPayload;
+  pulling?: boolean;
+  pushing?: boolean;
+  onPull: (mode: PullMode) => void;
+  onPush: () => void;
+  onBranchClick?: () => void;
 }
 
-export function ActionBar({ payload }: ActionBarProps) {
+export function ActionBar({
+  payload,
+  pulling,
+  pushing,
+  onPull,
+  onPush,
+  onBranchClick,
+}: ActionBarProps) {
+  const [pullMenuAnchor, setPullMenuAnchor] = useState<HTMLElement | null>(
+    null,
+  );
+  const pullBtnRef = useRef<HTMLButtonElement>(null);
+
+  const handlePullClick = () => {
+    onPull("default");
+  };
+
+  const handlePullContext = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setPullMenuAnchor(pullBtnRef.current);
+  };
+
   return (
     <Box
       sx={{
@@ -23,7 +52,15 @@ export function ActionBar({ payload }: ActionBarProps) {
       }}
     >
       {/* Left side: Repository & Branch information */}
-      <Box sx={{ display: "flex", alignItems: "center", gap: 3.5, pl: 2, justifySelf: "start" }}>
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          gap: 3.5,
+          pl: 2,
+          justifySelf: "start",
+        }}
+      >
         {/* Repo Info */}
         <Box sx={{ display: "flex", flexDirection: "column" }}>
           <Typography
@@ -83,22 +120,16 @@ export function ActionBar({ payload }: ActionBarProps) {
           >
             Branch
           </Typography>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mt: "4px", height: "18px" }}>
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#ffffff"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <line x1="6" y1="3" x2="6" y2="15" />
-              <circle cx="18" cy="6" r="3" />
-              <circle cx="6" cy="18" r="3" />
-              <path d="M18 9a9 9 0 0 1-9 9" />
-            </svg>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 0.5,
+              mt: "4px",
+              height: "18px",
+            }}
+          >
+            <Iconify icon="ion:git-branch-outline" width={14} sx={{ color: "#ffffff" }} />
             <Typography
               sx={{
                 fontSize: 15,
@@ -114,20 +145,121 @@ export function ActionBar({ payload }: ActionBarProps) {
       </Box>
 
       {/* Center: Quick Action Buttons */}
-      <Box sx={{ display: "flex", alignItems: "stretch", justifySelf: "center" }}>
-        <HeaderButton label="Undo" icon={<UndoIcon />} />
-        <HeaderButton label="Redo" icon={<RedoIcon />} />
-        <HeaderButton label="Pull" icon={<PullIcon />} />
-        <HeaderButton label="Push" icon={<PushIcon />} />
-        <HeaderButton label="Branch" icon={<BranchIcon />} />
-        <HeaderButton label="Stash" icon={<StashIcon />} />
-        <HeaderButton label="Pop" icon={<PopIcon />} />
+      <Box
+        sx={{ display: "flex", alignItems: "stretch", justifySelf: "center" }}
+      >
+        <HeaderButton
+          label="Undo"
+          icon={
+            <Iconify
+              icon="garden:reload-stroke-12"
+              width={16}
+              sx={{ transform: "scaleX(-1)" }}
+            />
+          }
+        />
+        <HeaderButton
+          label="Redo"
+          icon={<Iconify icon="garden:reload-stroke-12" width={16} />}
+        />
+        <HeaderButton
+          ref={pullBtnRef}
+          label="Pull"
+          icon={
+            pulling ? (
+              <CircularProgress size={16} sx={{ color: "inherit" }} />
+            ) : (
+              <Iconify icon="lucide:download" width={18} />
+            )
+          }
+          onClick={handlePullClick}
+          onContextMenu={handlePullContext}
+          disabled={pulling}
+          hasDropdown
+          onDropdownClick={(e) =>
+            setPullMenuAnchor(e.currentTarget.closest("button") as HTMLElement)
+          }
+        />
+        <HeaderButton
+          label="Push"
+          icon={
+            pushing ? (
+              <CircularProgress size={16} sx={{ color: "inherit" }} />
+            ) : (
+              <Iconify icon="lucide:upload" width={18} />
+            )
+          }
+          onClick={onPush}
+          disabled={pushing}
+        />
+        <HeaderButton
+          label="Branch"
+          icon={<Iconify icon="ion:git-branch-outline" width={18} />}
+          onClick={onBranchClick}
+        />
+        <HeaderButton label="Stash" icon={<Iconify icon="solar:download-minimalistic-bold" width={18} />} />
+        <HeaderButton label="Pop" icon={<Iconify icon="solar:upload-minimalistic-linear" width={18} />} />
       </Box>
 
       {/* Right side: Search Action */}
-      <Box sx={{ display: "flex", justifyContent: "flex-end", alignItems: "stretch", pr: 2, justifySelf: "end" }}>
-        <HeaderButton label="Search" icon={<SearchIcon />} />
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "flex-end",
+          alignItems: "stretch",
+          pr: 2,
+          justifySelf: "end",
+        }}
+      >
+        <HeaderButton label="Search" icon={<Iconify icon="lucide:search" width={18} />} />
       </Box>
+
+      {/* Pull mode menu */}
+      <Popover
+        open={!!pullMenuAnchor}
+        anchorEl={pullMenuAnchor}
+        onClose={() => setPullMenuAnchor(null)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+        transformOrigin={{ vertical: "top", horizontal: "center" }}
+        slotProps={{
+          paper: {
+            sx: {
+              bgcolor: "#2a2d34",
+              border: "1px solid",
+              borderColor: "divider",
+              borderRadius: "6px",
+              py: 0.5,
+              minWidth: 220,
+              mt: 0.5,
+            },
+          },
+        }}
+      >
+        <PullMenuItem
+          label="Pull (fast-forward if possible)"
+          description="Default — merge if fast-forward is not possible"
+          onClick={() => {
+            onPull("default");
+            setPullMenuAnchor(null);
+          }}
+        />
+        <PullMenuItem
+          label="Pull (fast-forward only)"
+          description="Abort if fast-forward is not possible"
+          onClick={() => {
+            onPull("ff-only");
+            setPullMenuAnchor(null);
+          }}
+        />
+        <PullMenuItem
+          label="Pull (rebase)"
+          description="Rebase current branch onto upstream"
+          onClick={() => {
+            onPull("rebase");
+            setPullMenuAnchor(null);
+          }}
+        />
+      </Popover>
     </Box>
   );
 }
@@ -138,9 +270,117 @@ interface HeaderButtonProps {
   label: string;
   icon: React.ReactNode;
   onClick?: () => void;
+  onContextMenu?: (e: React.MouseEvent) => void;
+  disabled?: boolean;
+  hasDropdown?: boolean;
+  onDropdownClick?: (e: React.MouseEvent) => void;
 }
 
-function HeaderButton({ label, icon, onClick }: HeaderButtonProps) {
+const HeaderButton = React.forwardRef<HTMLButtonElement, HeaderButtonProps>(
+  (
+    {
+      label,
+      icon,
+      onClick,
+      onContextMenu,
+      disabled,
+      hasDropdown,
+      onDropdownClick,
+    },
+    ref,
+  ) => (
+    <Box sx={{ display: "flex", alignItems: "stretch", position: "relative" }}>
+      <Box
+        component="button"
+        ref={ref}
+        onClick={disabled ? undefined : onClick}
+        onContextMenu={onContextMenu}
+        disabled={disabled}
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "flex-start",
+          pt: "7px",
+          gap: "4px",
+          height: "100%",
+          px: 1.5,
+          color: "#ffffff",
+          bgcolor: "transparent",
+          border: "none",
+          cursor: disabled ? "default" : "pointer",
+          opacity: disabled ? 0.5 : 1,
+          transition: "all 0.15s ease",
+          "&:hover": {
+            bgcolor: disabled ? "transparent" : "#292c33",
+          },
+          "&:active": {
+            bgcolor: "rgba(255, 255, 255, 0.05)",
+          },
+          outline: "none",
+        }}
+      >
+        <Typography
+          sx={{
+            fontSize: 11,
+            fontWeight: 300,
+            color: "inherit",
+            opacity: 0.65,
+            letterSpacing: "0.02em",
+            lineHeight: 1,
+          }}
+        >
+          {label}
+        </Typography>
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "inherit",
+          }}
+        >
+          {icon}
+        </Box>
+      </Box>
+      {hasDropdown && (
+        <Box
+          component="button"
+          onClick={onDropdownClick}
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 14,
+            bgcolor: "transparent",
+            border: "none",
+            color: "#ffffff",
+            opacity: 0.5,
+            cursor: "pointer",
+            px: 0,
+            ml: "-4px",
+            "&:hover": { opacity: 1 },
+            outline: "none",
+          }}
+        >
+          <svg width="7" height="7" viewBox="0 0 10 6" fill="currentColor">
+            <path d="M0 0l5 6 5-6z" />
+          </svg>
+        </Box>
+      )}
+    </Box>
+  ),
+);
+
+// ----------------------------------------------------------------------
+
+interface PullMenuItemProps {
+  label: string;
+  description: string;
+  onClick: () => void;
+}
+
+function PullMenuItem({ label, description, onClick }: PullMenuItemProps) {
   return (
     <Box
       component="button"
@@ -148,187 +388,26 @@ function HeaderButton({ label, icon, onClick }: HeaderButtonProps) {
       sx={{
         display: "flex",
         flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: "4px",
-        height: "100%",
+        gap: "2px",
+        width: "100%",
         px: 1.5,
-        color: "#ffffff",
+        py: 1,
         bgcolor: "transparent",
         border: "none",
+        color: "#ffffff",
         cursor: "pointer",
-        transition: "all 0.15s ease",
-        "&:hover": {
-          bgcolor: "#292c33",
-        },
-        "&:active": {
-          bgcolor: "rgba(255, 255, 255, 0.05)",
-        },
+        textAlign: "left",
+        "&:hover": { bgcolor: "rgba(255,255,255,0.06)" },
         outline: "none",
       }}
     >
-      <Typography
-        sx={{
-          fontSize: 11,
-          fontWeight: 300,
-          color: "inherit",
-          opacity: 0.65,
-          letterSpacing: "0.02em",
-          lineHeight: 1,
-        }}
-      >
+      <Typography sx={{ fontSize: 12.5, fontWeight: 600, lineHeight: 1.2 }}>
         {label}
       </Typography>
-      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", color: "inherit" }}>
-        {icon}
-      </Box>
+      <Typography sx={{ fontSize: 11, color: "#919eab", lineHeight: 1.2 }}>
+        {description}
+      </Typography>
     </Box>
   );
 }
 
-// ----------------------------------------------------------------------
-
-function UndoIcon() {
-  return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M3 7v6h6" />
-      <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" />
-    </svg>
-  );
-}
-
-function RedoIcon() {
-  return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M21 7v6h-6" />
-      <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7" />
-    </svg>
-  );
-}
-
-function PullIcon() {
-  return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M12 3v13M19 10l-7 7-7-7M5 21h14" />
-    </svg>
-  );
-}
-
-function PushIcon() {
-  return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M12 17V4M5 11l7-7 7 7M5 21h14" />
-    </svg>
-  );
-}
-
-function BranchIcon() {
-  return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <line x1="6" y1="3" x2="6" y2="15" />
-      <circle cx="18" cy="6" r="3" />
-      <circle cx="6" cy="18" r="3" />
-      <path d="M18 9a9 9 0 0 1-9 9" />
-    </svg>
-  );
-}
-
-// Box/archive-like Stash
-function StashIcon() {
-  return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M21 8H3V4h18v4zm-1 0v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8m6 4h4" />
-    </svg>
-  );
-}
-
-// Arrow popping out of Box
-function PopIcon() {
-  return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M21 8H3V4h18v4zm-1 0v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8m6 4h4" />
-      <path d="M12 12v-5M9 9l3-3 3 3" />
-    </svg>
-  );
-}
-
-function SearchIcon() {
-  return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <circle cx="11" cy="11" r="8" />
-      <line x1="21" y1="21" x2="16.65" y2="16.65" />
-    </svg>
-  );
-}

@@ -1,3 +1,4 @@
+import React, { useState } from "react";
 import Box from "@mui/material/Box";
 
 import type { GroupedRef } from "./commit-graph-types";
@@ -25,10 +26,32 @@ const ICON = {
 export function RefLabels({
   groups,
   laneColor,
+  isCreatingBranch,
+  onCancel,
+  onSubmit,
 }: {
   groups: GroupedRef[];
   laneColor: string;
+  isCreatingBranch?: boolean;
+  onCancel?: () => void;
+  onSubmit?: (name: string) => void;
 }) {
+  if (isCreatingBranch) {
+    return (
+      <Box
+        sx={{
+          position: "relative",
+          display: "flex",
+          alignItems: "center",
+          height: "100%",
+          zIndex: 10,
+        }}
+      >
+        <BranchInput laneColor={laneColor} onCancel={onCancel} onSubmit={onSubmit} />
+      </Box>
+    );
+  }
+
   if (groups.length === 0) return <div />;
 
   const primary = groups[0];
@@ -253,5 +276,73 @@ function RefExpandedRow({
         />
       ))}
     </Box>
+  );
+}
+
+// ----------------------------------------------------------------------
+
+function BranchInput({
+  laneColor,
+  onCancel,
+  onSubmit,
+}: {
+  laneColor: string;
+  onCancel?: () => void;
+  onSubmit?: (name: string) => void;
+}) {
+  const [val, setVal] = useState("");
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const trimmed = val.trim();
+      if (trimmed && onSubmit) {
+        onSubmit(trimmed);
+      } else if (onCancel) {
+        onCancel();
+      }
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      if (onCancel) onCancel();
+    }
+  };
+
+  return (
+    <Box
+      component="input"
+      autoFocus
+      placeholder="digite aqui"
+      value={val}
+      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setVal(e.target.value)}
+      onKeyDown={handleKeyDown}
+      onBlur={onCancel}
+      sx={{
+        position: "absolute",
+        left: "12px",
+        top: "50%",
+        transform: "translateY(-50%)",
+        bgcolor: "#16181c",
+        borderRadius: "4px",
+        px: "8px",
+        height: "26px",
+        minHeight: "26px",
+        maxHeight: "26px",
+        fontSize: 12.5,
+        fontWeight: 400,
+        color: "#fff",
+        border: "1px solid #292a2e",
+        outline: "none",
+        "&:focus": {
+          borderColor: "#0669f7",
+        },
+        width: 180,
+        fontFamily: "inherit",
+        boxSizing: "border-box",
+        zIndex: 10,
+        "&::placeholder": {
+          color: "rgba(255, 255, 255, 0.4)",
+        },
+      }}
+    />
   );
 }

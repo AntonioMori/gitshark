@@ -26,6 +26,9 @@ export function CommitGraph({
   payload,
   selectedIdx,
   onSelectRow,
+  creatingBranch,
+  onCancelCreateBranch,
+  onSubmitBranch,
 }: CommitGraphProps) {
   const PAL = payload.palette;
   const hasWip = payload.wip && payload.wip.total > 0;
@@ -327,6 +330,7 @@ export function CommitGraph({
           {payload.commits.map((c, i) => {
             const color = PAL[c.k % PAL.length];
             const grouped = groupRefs(c.r, payload.currentBranch);
+            const isHeadRow = c.h === payload.headHash;
 
             return (
               <Row
@@ -335,7 +339,13 @@ export function CommitGraph({
                 style={{ "--chip-color": color } as React.CSSProperties}
                 gridCols={`${labelsW}px ${graphW}px 1fr`}
               >
-                <RefLabels groups={grouped} laneColor={color} />
+                <RefLabels
+                  groups={grouped}
+                  laneColor={color}
+                  isCreatingBranch={isHeadRow && creatingBranch}
+                  onCancel={onCancelCreateBranch}
+                  onSubmit={onSubmitBranch}
+                />
                 <div />
                 <Box
                   sx={{

@@ -1,9 +1,9 @@
 import { useState, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
-import Snackbar from '@mui/material/Snackbar';
+import { Toaster, toast } from 'sonner';
 
-import type { RepoPayload } from 'src/types/electron';
+import type { RepoPayload, PullMode } from 'src/types/electron';
 
 import { TitleBar } from './title-bar';
 import { MenuBar } from './menu-bar';
@@ -27,9 +27,19 @@ type Tab = {
 export function GitSharkLayout() {
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [activeTab, setActiveTab] = useState(-1);
-  const [toast, setToast] = useState('');
+  const [pulling, setPulling] = useState(false);
+  const [pushing, setPushing] = useState(false);
+  const [creatingBranch, setCreatingBranch] = useState(false);
 
-  const showToast = useCallback((msg: string) => setToast(msg), []);
+  const showToast = useCallback((msg: string) => {
+    if (msg.toLowerCase().includes('erro') || msg.toLowerCase().includes('não foi') || msg.toLowerCase().includes('máximo')) {
+      toast.error(msg);
+    } else if (msg.toLowerCase().includes('sucesso') || msg.toLowerCase().includes('atualizado')) {
+      toast.success(msg);
+    } else {
+      toast(msg);
+    }
+  }, []);
 
   const activePayload = activeTab >= 0 && tabs[activeTab] ? tabs[activeTab].payload : null;
   const activeSelected = activeTab >= 0 && tabs[activeTab] ? tabs[activeTab].selectedIdx : -1;
@@ -116,6 +126,82 @@ export function GitSharkLayout() {
     });
   }, [activeTab]);
 
+  // --- Pull ---
+  const handlePull = useCallback(async (mode: PullMode) => {
+    const tab = tabs[activeTab];
+    if (!tab || pulling) return;
+
+    setPulling(true);
+    try {
+      const result = await window.api.gitPull(tab.payload.repoPath, mode);
+      if (result.error) {
+        showToast(result.error);
+      } else if (result.payload) {
+        setTabs((prev) => {
+          const updated = [...prev];
+          updated[activeTab] = { ...updated[activeTab], payload: result.payload! };
+          return updated;
+        });
+        const msg = result.output?.includes('Already up to date')
+          ? 'Já está atualizado.'
+          : 'Pull realizado com sucesso.';
+        showToast(msg);
+      }
+    } catch (err: any) {
+      showToast(`Erro ao executar pull: ${err.message || err}`);
+    } finally {
+      setPulling(false);
+    }
+  }, [tabs, activeTab, pulling, showToast]);
+
+  // --- Push ---
+  const handlePush = useCallback(async () => {
+    const tab = tabs[activeTab];
+    if (!tab || pushing) return;
+
+    setPushing(true);
+    try {
+      const result = await window.api.gitPush(tab.payload.repoPath);
+      if (result.error) {
+        showToast(result.error);
+      } else if (result.payload) {
+        setTabs((prev) => {
+          const updated = [...prev];
+          updated[activeTab] = { ...updated[activeTab], payload: result.payload! };
+          return updated;
+        });
+        showToast('Push realizado com sucesso.');
+      }
+    } catch (err: any) {
+      showToast(`Erro ao executar push: ${err.message || err}`);
+    } finally {
+      setPushing(false);
+    }
+  }, [tabs, activeTab, pushing, showToast]);
+
+  // --- Create Branch ---
+  const handleCreateBranch = useCallback(async (name: string) => {
+    const tab = tabs[activeTab];
+    if (!tab) return;
+    try {
+      const result = await window.api.gitBranch(tab.payload.repoPath, name);
+      if (result.error) {
+        showToast(result.error);
+      } else if (result.payload) {
+        setTabs((prev) => {
+          const updated = [...prev];
+          updated[activeTab] = { ...updated[activeTab], payload: result.payload! };
+          return updated;
+        });
+        showToast(`Branch '${name}' criada com sucesso.`);
+      }
+    } catch (err: any) {
+      showToast(`Erro ao criar branch: ${err.message || err}`);
+    } finally {
+      setCreatingBranch(false);
+    }
+  }, [tabs, activeTab, showToast]);
+
   return (
     <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column', bgcolor: 'background.default', overflow: 'hidden' }}>
       <TitleBar />
@@ -127,7 +213,16 @@ export function GitSharkLayout() {
         onActivateTab={activateTab}
         onCloseTab={closeTab}
       />
-      {activePayload && <ActionBar payload={activePayload} />}
+      {activePayload && (
+        <ActionBar
+          payload={activePayload}
+          pulling={pulling}
+          pushing={pushing}
+          onPull={handlePull}
+          onPush={handlePush}
+          onBranchClick={() => setCreatingBranch(true)}
+        />
+      )}
 
       {/* Workspace */}
       <Box sx={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
@@ -136,6 +231,9 @@ export function GitSharkLayout() {
             payload={activePayload}
             selectedIdx={activeSelected}
             onSelectRow={selectRow}
+            creatingBranch={creatingBranch}
+            onCancelCreateBranch={() => setCreatingBranch(false)}
+            onSubmitBranch={handleCreateBranch}
           />
         ) : (
           <WelcomeScreen onOpenRepo={openRepo} />
@@ -152,14 +250,7 @@ export function GitSharkLayout() {
 
       <StatusBar payload={activePayload} />
 
-      <Snackbar
-        open={!!toast}
-        message={toast}
-        autoHideDuration={2600}
-        onClose={() => setToast('')}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-        sx={{ bottom: 40 }}
-      />
+      <Toaster theme="dark" position="bottom-left" />
     </Box>
   );
 }

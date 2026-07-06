@@ -110,15 +110,15 @@ function collectRepoData(repo: string, maxCommits: number) {
   return { commits, currentBranch, headHash, wip, repoName: path.basename(repo) };
 }
 
-function computeLayout(commits: any[], currentBranch: string, headHash: string) {
+function computeLayout(commits: any[], currentBranch: string, headHash: string | null) {
   const index: Record<string, number> = {};
-  commits.forEach((c, i) => { index[c.hash] = i; });
+  commits.forEach((c: any, i: number) => { index[c.hash] = i; });
 
   const pinnedColumns: Record<string, number> = {};
   
   // Trace main/master chain to col 0
   const mainHeads: string[] = [];
-  commits.forEach((c) => {
+  commits.forEach((c: any) => {
     const isMain = c.refs.some(
       (r: any) => r.name === 'main' || r.name === 'master' || r.name.endsWith('/main') || r.name.endsWith('/master')
     );
@@ -127,8 +127,9 @@ function computeLayout(commits: any[], currentBranch: string, headHash: string) 
   mainHeads.forEach((h) => {
     let curr: string | null = h;
     while (curr && curr in index) {
-      pinnedColumns[curr] = 0;
-      const c = commits[index[curr]];
+      const activeHash = curr;
+      pinnedColumns[activeHash] = 0;
+      const c: any = commits[index[activeHash]];
       curr = c.parents && c.parents.length > 0 ? c.parents[0] : null;
     }
   });
@@ -556,6 +557,56 @@ ipcMain.handle('pick-folder', async () => {
 ipcMain.handle('load-repo', async (_event, repoPath: string, maxCommits?: number) => {
   try {
     return await buildPayload(repoPath, maxCommits || MAX_COMMITS);
+  } catch (err: any) {
+    return { error: err.message };
+  }
+});
+
+ipcMain.handle('git-pull', async (_event, repoPath: string, mode?: 'default' | 'rebase' | 'ff-only') => {
+  try {
+    const repo = resolveRepoRoot(repoPath);
+    const args = ['pull'];
+    if (mode === 'rebase') args.push('--rebase');
+    else if (mode === 'ff-only') args.push('--ff-only');
+    const output = runGit(repo, ...args);
+    const payload = await buildPayload(repo);
+    return { payload, output: output.trim() };
+  } catch (err: any) {
+    return { error: err.message };
+  }
+});
+
+ipcMain.handle('git-branch', async (_event, repoPath: string, name: string) => {
+  try {
+    const repo = resolveRepoRoot(repoPath);
+    runGit(repo, 'checkout', '-b', name);
+    const payload = await buildPayload(repo);
+    return { payload };
+  } catch (err: any) {
+    return { error: err.message };
+  }
+});
+
+ipcMain.handle('git-push', async (_event, repoPath: string) => {
+  try {
+    const repo = resolveRepoRoot(repoPath);
+    const currentBranch = runGit(repo, 'rev-parse', '--abbrev-ref', 'HEAD').trim();
+
+    let hasUpstream = false;
+    try {
+      runGit(repo, 'rev-parse', '--abbrev-ref', '@{u}');
+      hasUpstream = true;
+    } catch {}
+
+    let output = '';
+    if (hasUpstream) {
+      output = runGit(repo, 'push');
+    } else {
+      output = runGit(repo, 'push', '-u', 'origin', currentBranch);
+    }
+
+    const payload = await buildPayload(repo);
+    return { payload, output };
   } catch (err: any) {
     return { error: err.message };
   }

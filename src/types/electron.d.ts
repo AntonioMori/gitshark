@@ -1,6 +1,28 @@
+export type PullMode = 'default' | 'rebase' | 'ff-only';
+
+export interface GitPullResult {
+  payload?: RepoPayload;
+  output?: string;
+  error?: string;
+}
+
+export interface GitBranchResult {
+  payload?: RepoPayload;
+  error?: string;
+}
+
+export interface GitPushResult {
+  payload?: RepoPayload;
+  output?: string;
+  error?: string;
+}
+
 export interface ElectronAPI {
   pickFolder: () => Promise<{ cancelled?: boolean; path?: string }>;
   loadRepo: (path: string, maxCommits?: number) => Promise<RepoPayload | { error: string }>;
+  gitPull: (repoPath: string, mode?: PullMode) => Promise<GitPullResult>;
+  gitBranch: (repoPath: string, name: string) => Promise<GitBranchResult>;
+  gitPush: (repoPath: string) => Promise<GitPushResult>;
   winMinimize: () => void;
   winMaximize: () => void;
   winClose: () => void;

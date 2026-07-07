@@ -28,7 +28,10 @@
       "Bash(npx tsc:*)",
       "Skill(refactor)",
       "Bash(curl:*)",
-      "Bash(npx esbuild:*)"
+      "Bash(npx esbuild:*)",
+      "Skill(commit)",
+      "Bash(xargs grep:*)",
+      "Bash(find /c/Users/ITEMM/Desktop/repositorios/gitshark -name \"package.json\" -not -path \"*/node_modules/*\" -exec cat {} \\\\;)"
     ]
   }
 }

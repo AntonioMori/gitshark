@@ -11,10 +11,9 @@ export function TitleBar() {
         height: 32,
         display: 'flex',
         alignItems: 'center',
-        px: '10px',
-        bgcolor: '#1b1f23',
-        borderBottom: '1px solid',
-        borderColor: 'divider',
+        pl: '10px',
+        pr: 0,
+        bgcolor: '#1f1f1f',
         WebkitAppRegion: 'drag',
         userSelect: 'none',
       }}
@@ -22,16 +21,16 @@ export function TitleBar() {
       {/* Logo */}
       <Box
         sx={{
-          width: 16,
-          height: 16,
-          borderRadius: '4px',
+          width: 12,
+          height: 12,
+          borderRadius: '3px',
           background: 'conic-gradient(from 200deg, #00bcd4, #b158e0, #ec4899, #00bcd4)',
           mr: 1,
           flexShrink: 0,
         }}
       />
 
-      <Typography variant="body2" sx={{ fontWeight: 600, fontSize: 12, color: 'text.primary' }}>
+      <Typography variant="body2" sx={{ fontWeight: 600, fontSize: 11, color: 'text.primary' }}>
         GitShark Desktop
       </Typography>
 

@@ -13,6 +13,10 @@ export type CommitGraphProps = {
   payload: RepoPayload;
   selectedIdx: number;
   onSelectRow: (idx: number) => void;
+  creatingBranch?: boolean;
+  onCancelCreateBranch?: () => void;
+  onSubmitBranch?: (name: string) => void;
+  onRefresh?: (newPayload: RepoPayload) => void;
 };
 
 export type RowProps = {

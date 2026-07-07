@@ -3,6 +3,7 @@ import IconButton from "@mui/material/IconButton";
 import Button from "@mui/material/Button";
 import Typography from "@mui/material/Typography";
 import Divider from "@mui/material/Divider";
+import { Iconify } from "src/components/iconify";
 
 import type { RepoPayload } from "src/types/electron";
 
@@ -32,14 +33,12 @@ export function Toolbar({
   return (
     <Box
       sx={{
-        height: 38,
+        height: 34,
         display: "flex",
         alignItems: "center",
         px: 1,
         gap: "2px",
-        bgcolor: "background.paper",
-        borderBottom: "1px solid",
-        borderColor: "divider",
+        bgcolor: "#2a2d34",
         userSelect: "none",
       }}
     >
@@ -50,32 +49,12 @@ export function Toolbar({
         title="Abrir repositório (Ctrl+O)"
         sx={iconBtnSx}
       >
-        <svg
-          width="15"
-          height="15"
-          viewBox="0 0 16 16"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.5"
-        >
-          <path d="M1.5 4.5v8h13v-6.5h-7l-1.5-2h-4.5z" />
-        </svg>
+        <Iconify icon="lucide:folder-open" width={16} />
       </IconButton>
 
       {/* Rocket icon */}
       <IconButton size="small" title="Iniciar" sx={iconBtnSx}>
-        <svg
-          width="15"
-          height="15"
-          viewBox="0 0 16 16"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.3"
-        >
-          <path d="M8 1c-1.5 2-3 5-3 8 0 2 1 3.5 3 5 2-1.5 3-3 3-5 0-3-1.5-6-3-8z" />
-          <circle cx="8" cy="8.5" r="1.5" />
-          <path d="M5 9.5C3.5 10 2.5 11 2.5 11L4 13M11 9.5c1.5.5 2.5 1.5 2.5 1.5L12 13" />
-        </svg>
+        <Iconify icon="lucide:rocket" width={16} />
       </IconButton>
 
       <Divider orientation="vertical" flexItem sx={{ mx: 0.5, my: 1 }} />
@@ -113,77 +92,24 @@ export function Toolbar({
       <Box sx={{ flex: 1 }} />
 
       {/* Right side actions */}
-      <Button
-        size="small"
-        endIcon={<DownArrow />}
-        sx={{
-          ...toolbarBtnSx,
-          color: "#34d399",
-          "&:hover": { color: "#6ee7b7" },
-        }}
-      >
-        Upgrade
-      </Button>
 
       <IconButton size="small" title="Notificações" sx={iconBtnSx}>
-        <svg
-          width="14"
-          height="14"
-          viewBox="0 0 16 16"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.4"
-        >
-          <path d="M4 6a4 4 0 0 1 8 0c0 4 2 5 2 5H2s2-1 2-5" />
-          <path d="M6 13a2 2 0 0 0 4 0" />
-        </svg>
+        <Iconify icon="lucide:bell" width={15} />
       </IconButton>
 
       <IconButton size="small" title="Configurações" sx={iconBtnSx}>
-        <svg
-          width="14"
-          height="14"
-          viewBox="0 0 16 16"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.4"
-        >
-          <circle cx="8" cy="8" r="2.5" />
-          <path d="M8 1v2M8 13v2M1 8h2M13 8h2M3 3l1.5 1.5M11.5 11.5L13 13M3 13l1.5-1.5M11.5 4.5L13 3" />
-        </svg>
+        <Iconify icon="lucide:settings" width={15} />
       </IconButton>
 
       <Button
         size="small"
-        endIcon={<DownArrow />}
+        endIcon={<Iconify icon="lucide:chevron-down" width={8} />}
         sx={toolbarBtnSx}
-        startIcon={
-          <svg
-            width="12"
-            height="12"
-            viewBox="0 0 16 16"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.4"
-          >
-            <circle cx="8" cy="5" r="3" />
-            <path d="M2 15c0-3.3 2.7-6 6-6s6 2.7 6 6" />
-          </svg>
-        }
+        startIcon={<Iconify icon="lucide:user" width={12} />}
       >
         Default Profile
       </Button>
     </Box>
-  );
-}
-
-// ----------------------------------------------------------------------
-
-function DownArrow() {
-  return (
-    <svg width="8" height="8" viewBox="0 0 10 6" fill="currentColor">
-      <path d="M0 0l5 6 5-6z" />
-    </svg>
   );
 }
 
@@ -204,17 +130,20 @@ function TabChip({ label, active, color, onClick, onClose }: TabChipProps) {
         alignItems: "center",
         gap: 1,
         maxWidth: 200,
-        height: 26,
+        height: "100%",
+        alignSelf: "stretch",
         px: "14px",
-        bgcolor: active ? "#353c42" : "#2d3439",
-        borderBottom: active ? "2px solid" : "2px solid transparent",
-        borderBottomColor: active ? "primary.main" : "transparent",
+        bgcolor: active ? "#33373f" : "transparent",
         borderRadius: "4px 4px 0 0",
         color: active ? "text.primary" : "text.secondary",
         fontSize: 12,
         fontWeight: 500,
         cursor: "pointer",
-        "&:hover": { bgcolor: "#353c42", color: "text.primary" },
+        "& :hover": { color: "text.primary" },
+        "&:hover": {
+          bgcolor: active ? "#33373f" : "#32363e",
+          color: "text.primary",
+        },
       }}
     >
       {color && (

@@ -1,6 +1,8 @@
+import React, { useState } from "react";
 import Box from "@mui/material/Box";
 
 import type { GroupedRef } from "./commit-graph-types";
+import type { RepoRef } from "src/types/electron";
 import { chipBg } from "./utils";
 
 // ----------------------------------------------------------------------
@@ -25,10 +27,38 @@ const ICON = {
 export function RefLabels({
   groups,
   laneColor,
+  colWidth,
+  isCreatingBranch,
+  onCancel,
+  onSubmit,
+  commitHash,
+  onRefContextMenu,
 }: {
   groups: GroupedRef[];
   laneColor: string;
+  colWidth: number;
+  isCreatingBranch?: boolean;
+  onCancel?: () => void;
+  onSubmit?: (name: string) => void;
+  commitHash: string;
+  onRefContextMenu?: (e: React.MouseEvent, ref: RepoRef, commitHash: string) => void;
 }) {
+  if (isCreatingBranch) {
+    return (
+      <Box
+        sx={{
+          position: "relative",
+          display: "flex",
+          alignItems: "center",
+          height: "100%",
+          zIndex: 10,
+        }}
+      >
+        <BranchInput laneColor={laneColor} onCancel={onCancel} onSubmit={onSubmit} />
+      </Box>
+    );
+  }
+
   if (groups.length === 0) return <div />;
 
   const primary = groups[0];
@@ -52,7 +82,12 @@ export function RefLabels({
           : undefined,
       }}
     >
-      <RefChip group={primary} laneColor={laneColor} />
+      <RefChip
+        group={primary}
+        laneColor={laneColor}
+        colWidth={colWidth}
+        onContextMenu={(e) => onRefContextMenu?.(e, primary.ref, commitHash)}
+      />
 
       {hasOverflow && (
         <Box
@@ -67,7 +102,7 @@ export function RefLabels({
             px: "5px",
             fontSize: 10.5,
             fontWeight: 700,
-            color: "rgba(255,255,255,0.7)",
+            color: "rgba(255,255,255,1)",
             flexShrink: 0,
             transition: "opacity .1s",
           }}
@@ -93,9 +128,19 @@ export function RefLabels({
             overflow: "hidden",
           }}
         >
-          <RefExpandedRow group={primary} laneColor={laneColor} isPrimary />
+          <RefExpandedRow
+            group={primary}
+            laneColor={laneColor}
+            isPrimary
+            onContextMenu={(e) => onRefContextMenu?.(e, primary.ref, commitHash)}
+          />
           {overflow.map((g, i) => (
-            <RefExpandedRow key={i} group={g} laneColor={laneColor} />
+            <RefExpandedRow
+              key={i}
+              group={g}
+              laneColor={laneColor}
+              onContextMenu={(e) => onRefContextMenu?.(e, g.ref, commitHash)}
+            />
           ))}
         </Box>
       )}
@@ -108,9 +153,13 @@ export function RefLabels({
 function RefChip({
   group,
   laneColor,
+  colWidth,
+  onContextMenu,
 }: {
   group: GroupedRef;
   laneColor: string;
+  colWidth: number;
+  onContextMenu?: (e: React.MouseEvent) => void;
 }) {
   const { ref, remote, isCurrent, isTag } = group;
   const bg = chipBg(laneColor, isCurrent ? 0.50 : 0.25);
@@ -127,6 +176,7 @@ function RefChip({
     <Box
       component="span"
       title={title}
+      onContextMenu={onContextMenu}
       sx={{
         display: "flex",
         alignItems: "center",
@@ -138,13 +188,13 @@ function RefChip({
         height: "var(--row-h)",
         minHeight: "var(--row-h)",
         maxHeight: "var(--row-h)",
-        fontSize: 12,
-        fontWeight: 400,
+        fontSize: 13,
+        fontWeight: 500,
         color: "#fff",
         overflow: "hidden",
         whiteSpace: "nowrap",
         minWidth: 0,
-        maxWidth: 120,
+        maxWidth: Math.max(60, colWidth - 16),
       }}
     >
       {isCurrent && (
@@ -190,10 +240,12 @@ function RefExpandedRow({
   group,
   laneColor,
   isPrimary,
+  onContextMenu,
 }: {
   group: GroupedRef;
   laneColor: string;
   isPrimary?: boolean;
+  onContextMenu?: (e: React.MouseEvent) => void;
 }) {
   const { ref, remote, isCurrent, isTag } = group;
   const bg = chipBg(laneColor, isCurrent ? 0.50 : 0.25);
@@ -210,6 +262,7 @@ function RefExpandedRow({
 
   return (
     <Box
+      onContextMenu={onContextMenu}
       sx={{
         display: "flex",
         alignItems: "center",
@@ -218,7 +271,8 @@ function RefExpandedRow({
         height: "var(--row-h)",
         minHeight: "var(--row-h)",
         maxHeight: "var(--row-h)",
-        fontSize: 12,
+        fontSize: 11,
+        fontWeight: 500,
         color: "#fff",
         whiteSpace: "nowrap",
         overflow: "hidden",
@@ -253,5 +307,73 @@ function RefExpandedRow({
         />
       ))}
     </Box>
+  );
+}
+
+// ----------------------------------------------------------------------
+
+function BranchInput({
+  laneColor,
+  onCancel,
+  onSubmit,
+}: {
+  laneColor: string;
+  onCancel?: () => void;
+  onSubmit?: (name: string) => void;
+}) {
+  const [val, setVal] = useState("");
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const trimmed = val.trim();
+      if (trimmed && onSubmit) {
+        onSubmit(trimmed);
+      } else if (onCancel) {
+        onCancel();
+      }
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      if (onCancel) onCancel();
+    }
+  };
+
+  return (
+    <Box
+      component="input"
+      autoFocus
+      placeholder="digite aqui"
+      value={val}
+      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setVal(e.target.value)}
+      onKeyDown={handleKeyDown}
+      onBlur={onCancel}
+      sx={{
+        position: "absolute",
+        left: "12px",
+        top: "50%",
+        transform: "translateY(-50%)",
+        bgcolor: "#16181c",
+        borderRadius: "4px",
+        px: "8px",
+        height: "26px",
+        minHeight: "26px",
+        maxHeight: "26px",
+        fontSize: 11.5,
+        fontWeight: 400,
+        color: "#fff",
+        border: "1px solid #292a2e",
+        outline: "none",
+        "&:focus": {
+          borderColor: "#0669f7",
+        },
+        width: 180,
+        fontFamily: "inherit",
+        boxSizing: "border-box",
+        zIndex: 10,
+        "&::placeholder": {
+          color: "rgba(255, 255, 255, 0.4)",
+        },
+      }}
+    />
   );
 }

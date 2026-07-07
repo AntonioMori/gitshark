@@ -37,12 +37,12 @@ export function Iconify({ className, icon, width = 20, height, sx, ...other }: I
       ssr
       id={uniqueId}
       icon={icon}
+      width={width}
+      height={height ?? width}
       className={mergeClasses([iconifyClasses.root, className])}
       sx={[
         {
-          width,
           flexShrink: 0,
-          height: height ?? width,
           display: 'inline-flex',
         },
         ...(Array.isArray(sx) ? sx : [sx]),

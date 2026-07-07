@@ -46,10 +46,6 @@ export function StatusBar({ payload }: StatusBarProps) {
 }
 
 const rootSx = {
-  position: 'fixed' as const,
-  left: 0,
-  right: 0,
-  bottom: 0,
   height: 26,
   display: 'flex',
   alignItems: 'center',
@@ -58,6 +54,8 @@ const rootSx = {
   bgcolor: 'background.paper',
   borderTop: '1px solid',
   borderColor: 'divider',
+  flexShrink: 0,
+  width: '100%',
 };
 
 const textSx = {

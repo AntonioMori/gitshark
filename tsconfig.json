@@ -12,11 +12,9 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "baseUrl": ".",
     "paths": {
-      "src/*": ["src/*"]
-    },
-    "ignoreDeprecations": "6.0"
+      "src/*": ["./src/*"]
+    }
   },
   "include": ["src/**/*", "electron/**/*"],
   "exclude": ["node_modules", "out"]

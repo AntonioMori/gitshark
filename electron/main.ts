@@ -96,7 +96,7 @@ function collectRepoData(repo: string, maxCommits: number) {
 
   const wip: any = { modified: 0, added: 0, deleted: 0, untracked: 0 };
   try {
-    for (const line of runGit(repo, 'status', '--porcelain').split('\n')) {
+    for (const line of runGit(repo, '-c', 'core.quotepath=false', 'status', '--porcelain', '-u').split('\n')) {
       if (!line) continue;
       const code = line.slice(0, 2);
       if (code.startsWith('??')) wip.untracked++;
@@ -110,15 +110,15 @@ function collectRepoData(repo: string, maxCommits: number) {
   return { commits, currentBranch, headHash, wip, repoName: path.basename(repo) };
 }
 
-function computeLayout(commits: any[], currentBranch: string, headHash: string) {
+function computeLayout(commits: any[], currentBranch: string, headHash: string | null) {
   const index: Record<string, number> = {};
-  commits.forEach((c, i) => { index[c.hash] = i; });
+  commits.forEach((c: any, i: number) => { index[c.hash] = i; });
 
   const pinnedColumns: Record<string, number> = {};
   
   // Trace main/master chain to col 0
   const mainHeads: string[] = [];
-  commits.forEach((c) => {
+  commits.forEach((c: any) => {
     const isMain = c.refs.some(
       (r: any) => r.name === 'main' || r.name === 'master' || r.name.endsWith('/main') || r.name.endsWith('/master')
     );
@@ -127,25 +127,12 @@ function computeLayout(commits: any[], currentBranch: string, headHash: string) 
   mainHeads.forEach((h) => {
     let curr: string | null = h;
     while (curr && curr in index) {
-      pinnedColumns[curr] = 0;
-      const c = commits[index[curr]];
+      const activeHash = curr;
+      pinnedColumns[activeHash] = 0;
+      const c: any = commits[index[activeHash]];
       curr = c.parents && c.parents.length > 0 ? c.parents[0] : null;
     }
   });
-
-  // Pin active branch HEADs only to col 1 (do not trace the chain)
-  if (currentBranch && currentBranch !== 'main' && currentBranch !== 'master') {
-    commits.forEach((c) => {
-      const isActive = c.refs.some(
-        (r: any) => r.name === currentBranch || r.name.endsWith('/' + currentBranch)
-      );
-      if (isActive) {
-        if (pinnedColumns[c.hash] === undefined) {
-          pinnedColumns[c.hash] = 1;
-        }
-      }
-    });
-  }
 
   // PASS 1: Rough column assignment to determine final columns of all commits
   const pass1Lanes: (string | null)[] = [];
@@ -158,7 +145,7 @@ function computeLayout(commits: any[], currentBranch: string, headHash: string) 
       }
       return col;
     }
-    const startCol = 1;
+    const startCol = 0;
     for (let i = startCol; i < pass1Lanes.length; i++) {
       if (pass1Lanes[i] === null) {
         pass1Lanes[i] = hash;
@@ -255,7 +242,7 @@ function computeLayout(commits: any[], currentBranch: string, headHash: string) 
       }
       return col;
     } else {
-      const start = 1;
+      const start = 0;
       for (let i = start; i < lanes.length; i++) {
         if (lanes[i] === null) {
           lanes[i] = { hash: expectedHash, color: i % PALETTE.length };
@@ -294,26 +281,21 @@ function computeLayout(commits: any[], currentBranch: string, headHash: string) 
       const first = parents[0];
       lanes[lane].hash = first;
 
-      // Lookahead conflict:
-      const p1Winner = pass1Columns[first];
-      if (p1Winner !== undefined && p1Winner !== lane) {
-        lanes[lane] = null;
-      } else {
-        const colsForFirst = [lane];
-        for (let i = 0; i < lanes.length; i++) {
-          if (i !== lane && lanes[i] && lanes[i].hash === first) colsForFirst.push(i);
-        }
-        if (colsForFirst.length > 1) {
-          const winnerCol = p1Winner !== undefined ? p1Winner : Math.min(...colsForFirst);
-          for (const col of colsForFirst) {
-            if (col !== winnerCol) {
-              lanes[col] = null;
-            }
+      // Keep first parent in current lane to keep branches straight (similar to GitKraken)
+      const colsForFirst = [lane];
+      for (let i = 0; i < lanes.length; i++) {
+        if (i !== lane && lanes[i] && lanes[i].hash === first) colsForFirst.push(i);
+      }
+      if (colsForFirst.length > 1) {
+        const winnerCol = Math.min(...colsForFirst);
+        for (const col of colsForFirst) {
+          if (col !== winnerCol) {
+            lanes[col] = null;
           }
         }
       }
 
-      const routeLane = pass1Columns[first] !== undefined ? pass1Columns[first] : lane;
+      const routeLane = lane;
       if (first in index) {
         edges.push({
           childRow: row, childLane: lane,
@@ -510,12 +492,51 @@ async function buildPayload(repoPath: string, maxCommits = MAX_COMMITS) {
   }));
   const avatars = await fetchAvatars(avatarInput, repo);
 
+  let remoteUrl = '';
+  try {
+    remoteUrl = runGit(repo, 'remote', 'get-url', 'origin').trim();
+  } catch {}
+
   return {
     repoPath: repo, repoName,
     currentBranch, headHash,
     wip, commits: slim, edges,
     maxLanes, palette: PALETTE, avatars,
+    remoteUrl,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Repo Watcher
+// ---------------------------------------------------------------------------
+
+const repoWatchers = new Map<string, { watcher: fs.FSWatcher; timer: ReturnType<typeof setTimeout> | null }>();
+
+function startWatching(repoRoot: string) {
+  if (repoWatchers.has(repoRoot)) return;
+  const gitDir = path.join(repoRoot, '.git');
+  if (!fs.existsSync(gitDir) || !fs.statSync(gitDir).isDirectory()) return;
+
+  const entry: { watcher: fs.FSWatcher; timer: ReturnType<typeof setTimeout> | null } = { watcher: null as any, timer: null };
+
+  entry.watcher = fs.watch(gitDir, { recursive: true }, (_event, filename) => {
+    if (!filename) return;
+    const name = filename.toString().replace(/\\/g, '/');
+    // Ignore lock files and noisy internal git temp files
+    if (name.endsWith('.lock') || name.includes('/.git/') || name === 'index.lock') return;
+
+    if (entry.timer) clearTimeout(entry.timer);
+    entry.timer = setTimeout(() => {
+      entry.timer = null;
+      mainWindow?.webContents.send('repo-changed', repoRoot);
+    }, 600);
+  });
+
+  entry.watcher.on('error', () => {
+    repoWatchers.delete(repoRoot);
+  });
+
+  repoWatchers.set(repoRoot, entry);
 }
 
 // ---------------------------------------------------------------------------
@@ -574,9 +595,361 @@ ipcMain.handle('pick-folder', async () => {
 
 ipcMain.handle('load-repo', async (_event, repoPath: string, maxCommits?: number) => {
   try {
-    return await buildPayload(repoPath, maxCommits || MAX_COMMITS);
+    const result = await buildPayload(repoPath, maxCommits || MAX_COMMITS);
+    startWatching((result as any).repoPath ?? repoPath);
+    return result;
   } catch (err: any) {
     return { error: err.message };
+  }
+});
+
+ipcMain.handle('git-pull', async (_event, repoPath: string, mode?: 'default' | 'rebase' | 'ff-only') => {
+  try {
+    const repo = resolveRepoRoot(repoPath);
+    const args = ['pull'];
+    if (mode === 'rebase') args.push('--rebase');
+    else if (mode === 'ff-only') args.push('--ff-only');
+    const output = runGit(repo, ...args);
+    const payload = await buildPayload(repo);
+    return { payload, output: output.trim() };
+  } catch (err: any) {
+    return { error: err.message };
+  }
+});
+
+ipcMain.handle('git-branch', async (_event, repoPath: string, name: string, startPoint?: string) => {
+  try {
+    const repo = resolveRepoRoot(repoPath);
+    const args = ['checkout', '-b', name];
+    if (startPoint) args.push(startPoint);
+    runGit(repo, ...args);
+    const payload = await buildPayload(repo);
+    return { payload };
+  } catch (err: any) {
+    return { error: err.message };
+  }
+});
+
+ipcMain.handle('git-push', async (_event, repoPath: string) => {
+  try {
+    const repo = resolveRepoRoot(repoPath);
+    const currentBranch = runGit(repo, 'rev-parse', '--abbrev-ref', 'HEAD').trim();
+
+    let hasUpstream = false;
+    try {
+      runGit(repo, 'rev-parse', '--abbrev-ref', '@{u}');
+      hasUpstream = true;
+    } catch {}
+
+    let output = '';
+    if (hasUpstream) {
+      output = runGit(repo, 'push');
+    } else {
+      output = runGit(repo, 'push', '-u', 'origin', currentBranch);
+    }
+
+    const payload = await buildPayload(repo);
+    return { payload, output };
+  } catch (err: any) {
+    return { error: err.message };
+  }
+});
+
+ipcMain.handle('git-status-files', async (_event, repoPath: string) => {
+  try {
+    const repo = resolveRepoRoot(repoPath);
+    const raw = runGit(repo, '-c', 'core.quotepath=false', 'status', '--porcelain', '-u');
+    const staged: { path: string; status: string }[] = [];
+    const unstaged: { path: string; status: string }[] = [];
+    for (const line of raw.split('\n')) {
+      if (line.length < 4) continue;
+      const X = line[0];
+      const Y = line[1];
+      let filePath = line.slice(3);
+      if (filePath.includes(' -> ')) filePath = filePath.split(' -> ')[1];
+      filePath = filePath.trim();
+      if (filePath.startsWith('"') && filePath.endsWith('"')) {
+        filePath = filePath.slice(1, -1);
+      }
+      if (!filePath) continue;
+      if (X !== ' ' && X !== '?') staged.push({ path: filePath, status: X });
+      if (Y !== ' ' || X === '?') unstaged.push({ path: filePath, status: X === '?' ? '?' : Y });
+    }
+    return { staged, unstaged };
+  } catch (err: any) {
+    return { error: err.message, staged: [], unstaged: [] };
+  }
+});
+
+ipcMain.handle('git-stage-file', async (_event, repoPath: string, filePath: string) => {
+  try {
+    const repo = resolveRepoRoot(repoPath);
+    runGit(repo, 'add', '--', filePath);
+    return {};
+  } catch (err: any) {
+    return { error: err.message };
+  }
+});
+
+ipcMain.handle('git-stage-all', async (_event, repoPath: string) => {
+  try {
+    const repo = resolveRepoRoot(repoPath);
+    runGit(repo, 'add', '-A');
+    return {};
+  } catch (err: any) {
+    return { error: err.message };
+  }
+});
+
+ipcMain.handle('git-unstage-file', async (_event, repoPath: string, filePath: string) => {
+  try {
+    const repo = resolveRepoRoot(repoPath);
+    try {
+      runGit(repo, 'restore', '--staged', '--', filePath);
+    } catch {
+      runGit(repo, 'reset', 'HEAD', '--', filePath);
+    }
+    return {};
+  } catch (err: any) {
+    return { error: err.message };
+  }
+});
+
+ipcMain.handle('git-discard-all', async (_event, repoPath: string) => {
+  try {
+    const repo = resolveRepoRoot(repoPath);
+    try { runGit(repo, 'restore', '.'); } catch { runGit(repo, 'checkout', '--', '.'); }
+    return {};
+  } catch (err: any) {
+    return { error: err.message };
+  }
+});
+
+ipcMain.handle('git-commit-files', async (_event, repoPath: string, hash: string) => {
+  try {
+    const repo = resolveRepoRoot(repoPath);
+    const raw = runGit(repo, 'show', '--format=', '--name-status', hash);
+    const files: { path: string; status: string }[] = [];
+    for (const line of raw.split('\n')) {
+      if (line.length < 2) continue;
+      const parts = line.split('\t');
+      if (parts.length < 2) continue;
+      const status = parts[0][0];
+      const filePath = (parts.length > 2 ? parts[2] : parts[1]).trim();
+      if (filePath && status) files.push({ path: filePath, status });
+    }
+    return { files };
+  } catch (err: any) {
+    return { error: err.message, files: [] };
+  }
+});
+
+ipcMain.handle('git-commit', async (_event, repoPath: string, summary: string, description: string) => {
+  try {
+    const repo = resolveRepoRoot(repoPath);
+    const args = ['commit', '-m', summary];
+    if (description && description.trim()) args.push('-m', description.trim());
+    const output = runGit(repo, ...args);
+    const payload = await buildPayload(repo);
+    return { payload, output: output.trim() };
+  } catch (err: any) {
+    return { error: err.message };
+  }
+});
+
+ipcMain.handle('git-checkout-branch', async (_event, repoPath: string, name: string, mode: 'local' | 'track' | 'detached' = 'local', commitHash?: string) => {
+  try {
+    const repo = resolveRepoRoot(repoPath);
+    if (mode === 'detached') {
+      runGit(repo, 'checkout', '--detach', commitHash || name);
+    } else if (mode === 'track') {
+      const localName = name.split('/').slice(1).join('/');
+      try {
+        runGit(repo, 'checkout', '-b', localName, name);
+      } catch (err: any) {
+        try {
+          runGit(repo, 'checkout', localName);
+        } catch {
+          throw err;
+        }
+      }
+    } else {
+      runGit(repo, 'checkout', name);
+    }
+    const payload = await buildPayload(repo);
+    return { payload };
+  } catch (err: any) {
+    return { error: err.message };
+  }
+});
+
+ipcMain.handle('git-merge-branch', async (_event, repoPath: string, selectedBranch: string, targetBranch: string) => {
+  try {
+    const repo = resolveRepoRoot(repoPath);
+    const current = runGit(repo, 'rev-parse', '--abbrev-ref', 'HEAD').trim();
+    if (current !== targetBranch) {
+      runGit(repo, 'checkout', targetBranch);
+    }
+    const output = runGit(repo, 'merge', selectedBranch);
+    const payload = await buildPayload(repo);
+    return { payload, output: output.trim() };
+  } catch (err: any) {
+    return { error: err.message };
+  }
+});
+
+ipcMain.handle('git-rebase-branch', async (_event, repoPath: string, selectedBranch: string, targetBranch: string, interactive?: boolean) => {
+  try {
+    const repo = resolveRepoRoot(repoPath);
+    if (interactive) {
+      const current = runGit(repo, 'rev-parse', '--abbrev-ref', 'HEAD').trim();
+      if (current !== selectedBranch) {
+        runGit(repo, 'checkout', selectedBranch);
+      }
+      const output = runGit(repo, 'rebase', targetBranch);
+      const payload = await buildPayload(repo);
+      return { payload, output: `[Interactive Rebase Mocked] ${output.trim()}` };
+    }
+    const current = runGit(repo, 'rev-parse', '--abbrev-ref', 'HEAD').trim();
+    if (current !== selectedBranch) {
+      runGit(repo, 'checkout', selectedBranch);
+    }
+    const output = runGit(repo, 'rebase', targetBranch);
+    const payload = await buildPayload(repo);
+    return { payload, output: output.trim() };
+  } catch (err: any) {
+    return { error: err.message };
+  }
+});
+
+ipcMain.handle('git-delete-branch', async (_event, repoPath: string, name: string, local: boolean, remote: boolean) => {
+  try {
+    const repo = resolveRepoRoot(repoPath);
+    let errorMsg = '';
+    if (local) {
+      try {
+        runGit(repo, 'branch', '-D', name);
+      } catch (err: any) {
+        errorMsg += `Local: ${err.message}. `;
+      }
+    }
+    if (remote) {
+      try {
+        const remoteBranch = name.replace(/^origin\//, '');
+        runGit(repo, 'push', 'origin', '--delete', remoteBranch);
+      } catch (err: any) {
+        errorMsg += `Remote: ${err.message}. `;
+      }
+    }
+    if (errorMsg) {
+      throw new Error(errorMsg);
+    }
+    const payload = await buildPayload(repo);
+    return { payload };
+  } catch (err: any) {
+    return { error: err.message };
+  }
+});
+
+ipcMain.handle('git-rename-branch', async (_event, repoPath: string, oldName: string, newName: string) => {
+  try {
+    const repo = resolveRepoRoot(repoPath);
+    runGit(repo, 'branch', '-m', oldName, newName);
+    const payload = await buildPayload(repo);
+    return { payload };
+  } catch (err: any) {
+    return { error: err.message };
+  }
+});
+
+ipcMain.handle('git-reset-commit', async (_event, repoPath: string, branchName: string, commitHash: string, mode: 'soft' | 'mixed' | 'hard') => {
+  try {
+    const repo = resolveRepoRoot(repoPath);
+    const current = runGit(repo, 'rev-parse', '--abbrev-ref', 'HEAD').trim();
+    if (current !== branchName) {
+      runGit(repo, 'checkout', branchName);
+    }
+    runGit(repo, 'reset', `--${mode}`, commitHash);
+    const payload = await buildPayload(repo);
+    return { payload };
+  } catch (err: any) {
+    return { error: err.message };
+  }
+});
+
+ipcMain.handle('git-revert-commit', async (_event, repoPath: string, commitHash: string) => {
+  try {
+    const repo = resolveRepoRoot(repoPath);
+    runGit(repo, 'revert', '--no-edit', commitHash);
+    const payload = await buildPayload(repo);
+    return { payload };
+  } catch (err: any) {
+    return { error: err.message };
+  }
+});
+
+ipcMain.handle('git-cherry-pick-commit', async (_event, repoPath: string, commitHash: string) => {
+  try {
+    const repo = resolveRepoRoot(repoPath);
+    runGit(repo, 'cherry-pick', commitHash);
+    const payload = await buildPayload(repo);
+    return { payload };
+  } catch (err: any) {
+    return { error: err.message };
+  }
+});
+
+ipcMain.handle('git-diff-file', async (_event, repoPath: string, filePath: string, context: 'staged' | 'unstaged' | 'commit', commitHash?: string) => {
+  try {
+    const repo = resolveRepoRoot(repoPath);
+    let diff = '';
+    if (context === 'unstaged') {
+      // Try normal diff first
+      diff = runGit(repo, 'diff', '-U99999', '--', filePath);
+      // If empty, file might be untracked — generate a synthetic all-added diff
+      if (!diff.trim()) {
+        const absPath = path.join(repo, filePath);
+        if (fs.existsSync(absPath)) {
+          const content = fs.readFileSync(absPath, 'utf-8');
+          const lines = content.split('\n');
+          // Remove trailing empty line from split
+          if (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
+          diff = `diff --git a/${filePath} b/${filePath}\nnew file mode 100644\n--- /dev/null\n+++ b/${filePath}\n@@ -0,0 +1,${lines.length} @@\n${lines.map(l => '+' + l).join('\n')}\n`;
+        }
+      }
+    } else if (context === 'staged') {
+      diff = runGit(repo, 'diff', '--cached', '-U99999', '--', filePath);
+      // If empty, file might be newly staged (status A) — diff HEAD vs index
+      if (!diff.trim()) {
+        try {
+          const content = runGit(repo, 'show', `:${filePath}`);
+          const lines = content.split('\n');
+          if (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
+          diff = `diff --git a/${filePath} b/${filePath}\nnew file mode 100644\n--- /dev/null\n+++ b/${filePath}\n@@ -0,0 +1,${lines.length} @@\n${lines.map(l => '+' + l).join('\n')}\n`;
+        } catch { /* ignore */ }
+      }
+    } else if (context === 'commit' && commitHash) {
+      let isRoot = false;
+      try {
+        runGit(repo, 'rev-parse', `${commitHash}^`);
+      } catch {
+        isRoot = true;
+      }
+      if (isRoot) {
+        // Root commit — show entire file as added
+        try {
+          const content = runGit(repo, 'show', `${commitHash}:${filePath}`);
+          const lines = content.split('\n');
+          if (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
+          diff = `diff --git a/${filePath} b/${filePath}\nnew file mode 100644\n--- /dev/null\n+++ b/${filePath}\n@@ -0,0 +1,${lines.length} @@\n${lines.map(l => '+' + l).join('\n')}\n`;
+        } catch { /* ignore */ }
+      } else {
+        diff = runGit(repo, 'diff', '-U99999', `${commitHash}^`, commitHash, '--', filePath);
+      }
+    }
+    return { diff };
+  } catch (err: any) {
+    return { error: err.message, diff: '' };
   }
 });
 

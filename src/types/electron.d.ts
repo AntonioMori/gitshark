@@ -1,6 +1,72 @@
+export type PullMode = 'default' | 'rebase' | 'ff-only';
+
+export interface FileStatus {
+  path: string;
+  status: 'M' | 'A' | 'D' | 'R' | 'C' | '?';
+}
+
+export interface GitStatusFilesResult {
+  staged: FileStatus[];
+  unstaged: FileStatus[];
+  error?: string;
+}
+
+export interface GitCommitResult {
+  payload?: RepoPayload;
+  output?: string;
+  error?: string;
+}
+
+export interface GitPullResult {
+  payload?: RepoPayload;
+  output?: string;
+  error?: string;
+}
+
+export interface GitBranchResult {
+  payload?: RepoPayload;
+  error?: string;
+}
+
+export interface GitPushResult {
+  payload?: RepoPayload;
+  output?: string;
+  error?: string;
+}
+
+export interface GitCommitFilesResult {
+  files: FileStatus[];
+  error?: string;
+}
+
+export interface GitDiffFileResult {
+  diff: string;
+  error?: string;
+}
+
 export interface ElectronAPI {
   pickFolder: () => Promise<{ cancelled?: boolean; path?: string }>;
   loadRepo: (path: string, maxCommits?: number) => Promise<RepoPayload | { error: string }>;
+  gitPull: (repoPath: string, mode?: PullMode) => Promise<GitPullResult>;
+  gitBranch: (repoPath: string, name: string, startPoint?: string) => Promise<GitBranchResult>;
+  gitPush: (repoPath: string) => Promise<GitPushResult>;
+  gitStatusFiles: (repoPath: string) => Promise<GitStatusFilesResult>;
+  gitStageFile: (repoPath: string, filePath: string) => Promise<{ error?: string }>;
+  gitStageAll: (repoPath: string) => Promise<{ error?: string }>;
+  gitDiscardAll: (repoPath: string) => Promise<{ error?: string }>;
+  gitUnstageFile: (repoPath: string, filePath: string) => Promise<{ error?: string }>;
+  gitCommitFiles: (repoPath: string, hash: string) => Promise<GitCommitFilesResult>;
+  gitDiffFile: (repoPath: string, filePath: string, context: 'staged' | 'unstaged' | 'commit', commitHash?: string) => Promise<GitDiffFileResult>;
+  gitCommit: (repoPath: string, summary: string, description: string) => Promise<GitCommitResult>;
+  gitCheckoutBranch: (repoPath: string, name: string, mode?: 'local' | 'track' | 'detached', commitHash?: string) => Promise<{ payload?: RepoPayload; error?: string }>;
+  gitMergeBranch: (repoPath: string, selectedBranch: string, targetBranch: string) => Promise<{ payload?: RepoPayload; output?: string; error?: string }>;
+  gitRebaseBranch: (repoPath: string, selectedBranch: string, targetBranch: string, interactive?: boolean) => Promise<{ payload?: RepoPayload; output?: string; error?: string }>;
+  gitDeleteBranch: (repoPath: string, name: string, local: boolean, remote: boolean) => Promise<{ payload?: RepoPayload; error?: string }>;
+  gitRenameBranch: (repoPath: string, oldName: string, newName: string) => Promise<{ payload?: RepoPayload; error?: string }>;
+  gitResetCommit: (repoPath: string, branchName: string, commitHash: string, mode: 'soft' | 'mixed' | 'hard') => Promise<{ payload?: RepoPayload; error?: string }>;
+  gitRevertCommit: (repoPath: string, commitHash: string) => Promise<{ payload?: RepoPayload; error?: string }>;
+  gitCherryPickCommit: (repoPath: string, commitHash: string) => Promise<{ payload?: RepoPayload; error?: string }>;
+  onRepoChanged: (cb: (repoPath: string) => void) => () => void;
   winMinimize: () => void;
   winMaximize: () => void;
   winClose: () => void;
@@ -53,6 +119,7 @@ export interface RepoPayload {
   maxLanes: number;
   palette: string[];
   avatars: Record<string, string>; // md5 → data:image URL
+  remoteUrl?: string;
 }
 
 declare global {

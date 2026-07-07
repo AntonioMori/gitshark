@@ -1,5 +1,4 @@
 import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
 
 // ----------------------------------------------------------------------
 
@@ -9,34 +8,41 @@ export function MenuBar() {
   return (
     <Box
       sx={{
-        height: 28,
+        height: 22,
         display: 'flex',
         alignItems: 'center',
         px: '6px',
-        bgcolor: '#1b1f23',
+        bgcolor: '#1f1f1f',
         borderBottom: '1px solid',
         borderColor: 'divider',
         userSelect: 'none',
       }}
     >
       {MENU_ITEMS.map((item) => (
-        <Button
+        <Box
           key={item}
-          size="small"
+          component="button"
           sx={{
-            minWidth: 'auto',
-            px: '10px',
-            py: '2px',
-            fontSize: 12,
+            bgcolor: 'transparent',
+            border: 'none',
+            outline: 'none',
+            cursor: 'pointer',
+            height: 16,
+            px: '6px',
+            fontSize: 10.5,
+            fontWeight: 500,
             color: 'text.secondary',
             textTransform: 'none',
-            borderRadius: '3px',
-            lineHeight: 1,
+            borderRadius: '2px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontFamily: 'inherit',
             '&:hover': { bgcolor: 'rgba(255,255,255,0.08)', color: 'text.primary' },
           }}
         >
           {item}
-        </Button>
+        </Box>
       ))}
     </Box>
   );

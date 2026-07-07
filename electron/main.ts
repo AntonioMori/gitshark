@@ -501,6 +501,39 @@ async function buildPayload(repoPath: string, maxCommits = MAX_COMMITS) {
 }
 
 // ---------------------------------------------------------------------------
+// Repo Watcher
+// ---------------------------------------------------------------------------
+
+const repoWatchers = new Map<string, { watcher: fs.FSWatcher; timer: ReturnType<typeof setTimeout> | null }>();
+
+function startWatching(repoRoot: string) {
+  if (repoWatchers.has(repoRoot)) return;
+  const gitDir = path.join(repoRoot, '.git');
+  if (!fs.existsSync(gitDir) || !fs.statSync(gitDir).isDirectory()) return;
+
+  const entry: { watcher: fs.FSWatcher; timer: ReturnType<typeof setTimeout> | null } = { watcher: null as any, timer: null };
+
+  entry.watcher = fs.watch(gitDir, { recursive: true }, (_event, filename) => {
+    if (!filename) return;
+    const name = filename.toString().replace(/\\/g, '/');
+    // Ignore lock files and noisy internal git temp files
+    if (name.endsWith('.lock') || name.includes('/.git/') || name === 'index.lock') return;
+
+    if (entry.timer) clearTimeout(entry.timer);
+    entry.timer = setTimeout(() => {
+      entry.timer = null;
+      mainWindow?.webContents.send('repo-changed', repoRoot);
+    }, 600);
+  });
+
+  entry.watcher.on('error', () => {
+    repoWatchers.delete(repoRoot);
+  });
+
+  repoWatchers.set(repoRoot, entry);
+}
+
+// ---------------------------------------------------------------------------
 // Electron App
 // ---------------------------------------------------------------------------
 
@@ -556,7 +589,9 @@ ipcMain.handle('pick-folder', async () => {
 
 ipcMain.handle('load-repo', async (_event, repoPath: string, maxCommits?: number) => {
   try {
-    return await buildPayload(repoPath, maxCommits || MAX_COMMITS);
+    const result = await buildPayload(repoPath, maxCommits || MAX_COMMITS);
+    startWatching((result as any).repoPath ?? repoPath);
+    return result;
   } catch (err: any) {
     return { error: err.message };
   }

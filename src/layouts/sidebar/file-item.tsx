@@ -21,11 +21,13 @@ export function FileItem({ file, staged, onClick }: Props) {
   const dir = slash >= 0 ? normalized.slice(0, slash + 1) : "";
   const name = slash >= 0 ? normalized.slice(slash + 1) : normalized;
 
+  const isStaged = !!staged;
+
   return (
     <Box
       component="button"
       onClick={onClick}
-      title={staged ? `Unstage: ${file.path}` : `Stage: ${file.path}`}
+      title={isStaged ? `Unstage: ${file.path}` : `Stage: ${file.path}`}
       sx={{
         display: "flex",
         alignItems: "center",
@@ -37,7 +39,10 @@ export function FileItem({ file, staged, onClick }: Props) {
         border: "none",
         cursor: "pointer",
         textAlign: "left",
-        "&:hover": { bgcolor: "#2b3446" },
+        "&:hover": {
+          bgcolor: "#2b3446",
+          "& .file-action-btn": { opacity: 1 },
+        },
         outline: "none",
         overflow: "hidden",
         minWidth: 0,
@@ -48,12 +53,47 @@ export function FileItem({ file, staged, onClick }: Props) {
         width={14}
         sx={{ color: info.color, flexShrink: 0 }}
       />
-      <Typography noWrap sx={{ fontSize: 13, lineHeight: 1.5, minWidth: 0 }}>
+      <Typography
+        noWrap
+        sx={{
+          fontSize: 14,
+          minWidth: 0,
+          alignSelf: "center",
+          justifySelf: "center",
+          display: "flex",
+          alignItems: "center",
+          lineHeight: 1.4,
+          fontFamily: "'Segoe UI', sans-serif !important",
+        }}
+      >
         <span style={{ color: "#777d88" }}>{dir}</span>
         <span style={{ color: "rgba(255,255,255,0.7)", fontWeight: 500 }}>
           {name}
         </span>
       </Typography>
+      <Box sx={{ flex: 1 }} />
+      <Box
+        component="span"
+        className="file-action-btn"
+        sx={{
+          opacity: 0,
+          transition: "opacity 0.15s",
+          fontSize: 12,
+          color: "rgba(255,255,255,0.8)",
+          fontWeight: 500,
+          border: isStaged ? "1px solid #d9413d" : "1px solid #5cb85c",
+          borderRadius: "2px",
+          px: 0.75,
+          py: "3px",
+          bgcolor: isStaged ? "#4a2f33" : "#314739",
+          flexShrink: 0,
+          "&:hover": isStaged
+            ? { bgcolor: "#923839", borderColor: "#923839" }
+            : { bgcolor: "#477f4b", borderColor: "#477f4b" },
+        }}
+      >
+        {isStaged ? "Unstage file" : "Stage file"}
+      </Box>
     </Box>
   );
 }

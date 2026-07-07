@@ -52,6 +52,7 @@ export interface ElectronAPI {
   gitUnstageFile: (repoPath: string, filePath: string) => Promise<{ error?: string }>;
   gitCommitFiles: (repoPath: string, hash: string) => Promise<GitCommitFilesResult>;
   gitCommit: (repoPath: string, summary: string, description: string) => Promise<GitCommitResult>;
+  onRepoChanged: (cb: (repoPath: string) => void) => () => void;
   winMinimize: () => void;
   winMaximize: () => void;
   winClose: () => void;

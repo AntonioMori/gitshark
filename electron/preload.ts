@@ -13,6 +13,11 @@ contextBridge.exposeInMainWorld('api', {
   gitUnstageFile: (repoPath: string, filePath: string) => ipcRenderer.invoke('git-unstage-file', repoPath, filePath),
   gitCommitFiles: (repoPath: string, hash: string) => ipcRenderer.invoke('git-commit-files', repoPath, hash),
   gitCommit: (repoPath: string, summary: string, description: string) => ipcRenderer.invoke('git-commit', repoPath, summary, description),
+  onRepoChanged: (cb: (repoPath: string) => void) => {
+    const handler = (_: Electron.IpcRendererEvent, repoPath: string) => cb(repoPath);
+    ipcRenderer.on('repo-changed', handler);
+    return () => ipcRenderer.off('repo-changed', handler);
+  },
   winMinimize: () => ipcRenderer.send('win-minimize'),
   winMaximize: () => ipcRenderer.send('win-maximize'),
   winClose: () => ipcRenderer.send('win-close'),

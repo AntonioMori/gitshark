@@ -101,6 +101,51 @@ export function CommitDetail({ commit, payload, onClose }: Props) {
         "& *": { fontFamily: `${FONT} !important` },
       }}
     >
+      {/* ── WIP banner ── */}
+      {payload.wip.total > 0 && (
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 1.25,
+            px: 1.5,
+            height: 36,
+            flexShrink: 0,
+            bgcolor: "#364f83",
+          }}
+        >
+          <Typography
+            sx={{ fontSize: 12, color: TEXT, lineHeight: 1, fontWeight: 400 }}
+          >
+            {payload.wip.total} file{payload.wip.total !== 1 ? "s" : ""} changes
+            in working directory
+          </Typography>
+          <Box
+            component="button"
+            onClick={onClose}
+            sx={{
+              background: "none",
+              border: "1px solid rgba(255,255,255,0.8)",
+              borderRadius: "2px",
+              px: 1,
+              py: "4px",
+              color: "rgba(255,255,255,0.8)",
+              fontSize: 12,
+              cursor: "pointer",
+              lineHeight: 1,
+              transition: "border-color 0.15s, color 0.15s",
+              "&:hover": {
+                borderColor: "rgba(255,255,255,1)",
+                color: "rgba(255,255,255,1)",
+              },
+            }}
+          >
+            View changes
+          </Box>
+        </Box>
+      )}
+
       {/* ── Header ── */}
       <Box
         sx={{
@@ -393,7 +438,15 @@ function DetailFileItem({ file }: { file: FileStatus }) {
         width={15}
         sx={{ color: info.color, flexShrink: 0 }}
       />
-      <Typography noWrap sx={{ fontSize: 13.5, minWidth: 0, letterSpacing: 0.25, fontFamily: "Inter" }}>
+      <Typography
+        noWrap
+        sx={{
+          fontSize: 13.5,
+          minWidth: 0,
+          letterSpacing: 0.25,
+          fontFamily: "Inter",
+        }}
+      >
         <span style={{ color: "#777d88", fontWeight: 500 }}>{dir}</span>
         <span style={{ color: "rgba(255,255,255,0.8)", fontWeight: 400 }}>
           {name}

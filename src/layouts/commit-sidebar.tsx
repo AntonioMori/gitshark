@@ -225,8 +225,7 @@ export function CommitSidebar({ payload, onRefresh }: Props) {
           height: "100%",
           overflow: "hidden",
           userSelect: "none",
-          fontFamily: FONT,
-          "& *": { fontFamily: `${FONT} !important` },
+          "& *": { fontFamily: FONT },
         }}
       >
         {/* ── TOP SECTION ── */}
@@ -263,11 +262,11 @@ export function CommitSidebar({ payload, onRefresh }: Props) {
                 ...iconBtn,
                 bgcolor: RED_BG,
                 border: "1px solid #d9413d",
-                borderRadius: "4px",
+                borderRadius: "2px",
                 width: 24,
                 height: 24,
                 flexShrink: 0,
-                "& .trash-icon": { opacity: 1, transition: "opacity 0.15s" },
+                "& .trash-icon": { opacity: 0.7, transition: "opacity 0.1s" },
                 "&:hover": {
                   bgcolor: "#923839",
                   "& .trash-icon": { opacity: 1 },
@@ -277,7 +276,7 @@ export function CommitSidebar({ payload, onRefresh }: Props) {
             >
               <Iconify
                 icon="solar:trash-bin-trash-linear"
-                width={14}
+                width={16}
                 className="trash-icon"
                 sx={{ color: TEXT }}
               />
@@ -562,11 +561,16 @@ export function CommitSidebar({ payload, onRefresh }: Props) {
                 cursor: "pointer",
                 display: "flex",
                 alignItems: "center",
-                gap: 0.5,
+                gap: 0.25,
                 userSelect: "none",
               }}
             >
-              {showOptions ? "▼" : "▶"} Commit options
+              <Iconify
+                icon={showOptions ? "ic:baseline-arrow-drop-down" : "ic:baseline-arrow-right"}
+                width={16}
+                sx={{ ml: -0.5 }}
+              />
+              Commit options
             </Typography>
             {showOptions && (
               <Box

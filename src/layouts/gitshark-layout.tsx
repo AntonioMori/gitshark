@@ -82,6 +82,21 @@ export function GitSharkLayout() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Auto-refresh when external git changes are detected (e.g. commit from terminal)
+  useEffect(() => {
+    const unsub = window.api.onRepoChanged((changedPath) => {
+      window.api.loadRepo(changedPath).then((result) => {
+        if ('error' in result) return;
+        setTabs((prev) =>
+          prev.map((t) =>
+            t.payload.repoPath === changedPath ? { ...t, payload: result as RepoPayload } : t
+          )
+        );
+      });
+    });
+    return unsub;
+  }, []);
+
   // Persist session whenever tabs or activeTab change
   useEffect(() => {
     if (!canSaveRef.current) return;

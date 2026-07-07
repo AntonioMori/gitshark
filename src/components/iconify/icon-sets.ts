@@ -784,4 +784,7 @@ export default {
   "ic:baseline-add": {
     body: '<path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z"/>',
   },
+  "ic:baseline-arrow-right": {
+    body: '<path fill="currentColor" d="m10 17l5-5l-5-5z"/>',
+  },
 };

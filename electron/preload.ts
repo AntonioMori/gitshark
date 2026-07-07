@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('api', {
   gitStatusFiles: (repoPath: string) => ipcRenderer.invoke('git-status-files', repoPath),
   gitStageFile: (repoPath: string, filePath: string) => ipcRenderer.invoke('git-stage-file', repoPath, filePath),
   gitStageAll: (repoPath: string) => ipcRenderer.invoke('git-stage-all', repoPath),
+  gitDiscardAll: (repoPath: string) => ipcRenderer.invoke('git-discard-all', repoPath),
   gitUnstageFile: (repoPath: string, filePath: string) => ipcRenderer.invoke('git-unstage-file', repoPath, filePath),
   gitCommit: (repoPath: string, summary: string, description: string) => ipcRenderer.invoke('git-commit', repoPath, summary, description),
   winMinimize: () => ipcRenderer.send('win-minimize'),

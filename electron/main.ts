@@ -669,6 +669,16 @@ ipcMain.handle('git-unstage-file', async (_event, repoPath: string, filePath: st
   }
 });
 
+ipcMain.handle('git-discard-all', async (_event, repoPath: string) => {
+  try {
+    const repo = resolveRepoRoot(repoPath);
+    try { runGit(repo, 'restore', '.'); } catch { runGit(repo, 'checkout', '--', '.'); }
+    return {};
+  } catch (err: any) {
+    return { error: err.message };
+  }
+});
+
 ipcMain.handle('git-commit', async (_event, repoPath: string, summary: string, description: string) => {
   try {
     const repo = resolveRepoRoot(repoPath);

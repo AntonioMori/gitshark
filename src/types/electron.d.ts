@@ -43,6 +43,7 @@ export interface ElectronAPI {
   gitStatusFiles: (repoPath: string) => Promise<GitStatusFilesResult>;
   gitStageFile: (repoPath: string, filePath: string) => Promise<{ error?: string }>;
   gitStageAll: (repoPath: string) => Promise<{ error?: string }>;
+  gitDiscardAll: (repoPath: string) => Promise<{ error?: string }>;
   gitUnstageFile: (repoPath: string, filePath: string) => Promise<{ error?: string }>;
   gitCommit: (repoPath: string, summary: string, description: string) => Promise<GitCommitResult>;
   winMinimize: () => void;

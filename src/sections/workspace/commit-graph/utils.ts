@@ -7,7 +7,7 @@ import type { GroupedRef } from "./commit-graph-types";
 export const LANE_W = 22;
 export const GRAPH_PAD = 14;
 export const SPACER = 1;
-export const FONT = "'Open Sans', Arial, sans-serif";
+export const FONT = '"Inter Variable", Inter, sans-serif';
 export const MONO_FONT = "'JetBrains Mono', Consolas, Monaco, Menlo, monospace";
 
 export const ROW_H = 22;

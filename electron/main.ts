@@ -679,6 +679,25 @@ ipcMain.handle('git-discard-all', async (_event, repoPath: string) => {
   }
 });
 
+ipcMain.handle('git-commit-files', async (_event, repoPath: string, hash: string) => {
+  try {
+    const repo = resolveRepoRoot(repoPath);
+    const raw = runGit(repo, 'show', '--format=', '--name-status', hash);
+    const files: { path: string; status: string }[] = [];
+    for (const line of raw.split('\n')) {
+      if (line.length < 2) continue;
+      const parts = line.split('\t');
+      if (parts.length < 2) continue;
+      const status = parts[0][0];
+      const filePath = (parts.length > 2 ? parts[2] : parts[1]).trim();
+      if (filePath && status) files.push({ path: filePath, status });
+    }
+    return { files };
+  } catch (err: any) {
+    return { error: err.message, files: [] };
+  }
+});
+
 ipcMain.handle('git-commit', async (_event, repoPath: string, summary: string, description: string) => {
   try {
     const repo = resolveRepoRoot(repoPath);

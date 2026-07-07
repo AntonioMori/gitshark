@@ -42,8 +42,6 @@ export function ActionBar({
       sx={{
         height: 48,
         bgcolor: "#33373f",
-        borderBottom: "1px solid",
-        borderColor: "divider",
         display: "grid",
         gridTemplateColumns: "1fr auto 1fr",
         alignItems: "stretch",
@@ -129,7 +127,11 @@ export function ActionBar({
               height: "18px",
             }}
           >
-            <Iconify icon="ion:git-branch-outline" width={14} sx={{ color: "#ffffff" }} />
+            <Iconify
+              icon="ion:git-branch-outline"
+              width={14}
+              sx={{ color: "#ffffff" }}
+            />
             <Typography
               sx={{
                 fontSize: 15,
@@ -197,8 +199,14 @@ export function ActionBar({
           icon={<Iconify icon="ion:git-branch-outline" width={18} />}
           onClick={onBranchClick}
         />
-        <HeaderButton label="Stash" icon={<Iconify icon="solar:download-minimalistic-bold" width={18} />} />
-        <HeaderButton label="Pop" icon={<Iconify icon="solar:upload-minimalistic-linear" width={18} />} />
+        <HeaderButton
+          label="Stash"
+          icon={<Iconify icon="solar:download-minimalistic-bold" width={18} />}
+        />
+        <HeaderButton
+          label="Pop"
+          icon={<Iconify icon="solar:upload-minimalistic-linear" width={18} />}
+        />
       </Box>
 
       {/* Right side: Search Action */}
@@ -207,11 +215,14 @@ export function ActionBar({
           display: "flex",
           justifyContent: "flex-end",
           alignItems: "stretch",
-          pr: 2,
+          pr: 0.5,
           justifySelf: "end",
         }}
       >
-        <HeaderButton label="Search" icon={<Iconify icon="lucide:search" width={18} />} />
+        <HeaderButton
+          label="Search"
+          icon={<Iconify icon="lucide:search" width={18} />}
+        />
       </Box>
 
       {/* Pull mode menu */}
@@ -410,4 +421,3 @@ function PullMenuItem({ label, description, onClick }: PullMenuItemProps) {
     </Box>
   );
 }
-

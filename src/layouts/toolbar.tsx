@@ -39,8 +39,6 @@ export function Toolbar({
         px: 1,
         gap: "2px",
         bgcolor: "#2a2d34",
-        borderBottom: "1px solid",
-        borderColor: "divider",
         userSelect: "none",
       }}
     >
@@ -94,17 +92,6 @@ export function Toolbar({
       <Box sx={{ flex: 1 }} />
 
       {/* Right side actions */}
-      <Button
-        size="small"
-        endIcon={<Iconify icon="lucide:chevron-down" width={8} />}
-        sx={{
-          ...toolbarBtnSx,
-          color: "#34d399",
-          "&:hover": { color: "#6ee7b7" },
-        }}
-      >
-        Upgrade
-      </Button>
 
       <IconButton size="small" title="Notificações" sx={iconBtnSx}>
         <Iconify icon="lucide:bell" width={15} />
@@ -125,7 +112,6 @@ export function Toolbar({
     </Box>
   );
 }
-
 
 type TabChipProps = {
   label: string;
@@ -154,7 +140,10 @@ function TabChip({ label, active, color, onClick, onClose }: TabChipProps) {
         fontWeight: 500,
         cursor: "pointer",
         "& :hover": { color: "text.primary" },
-        "&:hover": { bgcolor: active ? "#33373f" : "#32363e", color: "text.primary" },
+        "&:hover": {
+          bgcolor: active ? "#33373f" : "#32363e",
+          color: "text.primary",
+        },
       }}
     >
       {color && (

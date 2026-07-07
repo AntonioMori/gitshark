@@ -34,7 +34,7 @@ export function DetailPanel({ open, commit, payload, onClose, rightOffset = 0 }:
         sx={{
           position: 'fixed',
           right: rightOffset,
-          top: 98 + 28, // titlebar(32) + menubar(28) + toolbar(38) + colhead(28)
+          top: 98 + 22, // titlebar(32) + menubar(28) + toolbar(38) + colhead(22)
           bottom: 26, // statusbar
           width: 300,
           bgcolor: 'background.paper',

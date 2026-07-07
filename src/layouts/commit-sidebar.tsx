@@ -264,7 +264,7 @@ export function CommitSidebar({ payload, onRefresh }: Props) {
                 width: 24,
                 height: 24,
                 flexShrink: 0,
-                "& .trash-icon": { opacity: 0.8, transition: "opacity 0.15s" },
+                "& .trash-icon": { opacity: 1, transition: "opacity 0.15s" },
                 "&:hover": {
                   bgcolor: "#923839",
                   "& .trash-icon": { opacity: 1 },
@@ -274,7 +274,7 @@ export function CommitSidebar({ payload, onRefresh }: Props) {
             >
               <Iconify
                 icon="solar:trash-bin-trash-linear"
-                width={13}
+                width={14}
                 className="trash-icon"
                 sx={{ color: TEXT }}
               />

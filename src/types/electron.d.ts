@@ -34,6 +34,11 @@ export interface GitPushResult {
   error?: string;
 }
 
+export interface GitCommitFilesResult {
+  files: FileStatus[];
+  error?: string;
+}
+
 export interface ElectronAPI {
   pickFolder: () => Promise<{ cancelled?: boolean; path?: string }>;
   loadRepo: (path: string, maxCommits?: number) => Promise<RepoPayload | { error: string }>;
@@ -45,6 +50,7 @@ export interface ElectronAPI {
   gitStageAll: (repoPath: string) => Promise<{ error?: string }>;
   gitDiscardAll: (repoPath: string) => Promise<{ error?: string }>;
   gitUnstageFile: (repoPath: string, filePath: string) => Promise<{ error?: string }>;
+  gitCommitFiles: (repoPath: string, hash: string) => Promise<GitCommitFilesResult>;
   gitCommit: (repoPath: string, summary: string, description: string) => Promise<GitCommitResult>;
   winMinimize: () => void;
   winMaximize: () => void;

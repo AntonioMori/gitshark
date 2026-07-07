@@ -11,9 +11,9 @@ import { Toolbar } from './toolbar';
 import { ActionBar } from './action-bar';
 import { WelcomeScreen } from 'src/sections/workspace/welcome-screen';
 import { CommitGraph } from 'src/sections/workspace/commit-graph/commit-graph';
-import { DetailPanel } from 'src/sections/workspace/detail-panel';
 import { StatusBar } from 'src/sections/workspace/status-bar';
-import { CommitSidebar, COMMIT_SIDEBAR_WIDTH } from './commit-sidebar';
+import { CommitSidebar } from './commit-sidebar';
+import { CommitDetail } from './sidebar/commit-detail';
 
 // ----------------------------------------------------------------------
 
@@ -304,18 +304,17 @@ export function GitSharkLayout() {
           )}
         </Box>
         {activePayload && (
-          <CommitSidebar payload={activePayload} onRefresh={handleRefresh} />
+          activeSelected >= 0 && activeCommit ? (
+            <CommitDetail
+              commit={activeCommit}
+              payload={activePayload}
+              onClose={closeDetail}
+            />
+          ) : (
+            <CommitSidebar payload={activePayload} onRefresh={handleRefresh} />
+          )
         )}
       </Box>
-
-      {/* Detail panel */}
-      <DetailPanel
-        open={activeSelected >= 0}
-        commit={activeCommit}
-        payload={activePayload}
-        onClose={closeDetail}
-        rightOffset={activePayload ? COMMIT_SIDEBAR_WIDTH : 0}
-      />
 
       <StatusBar payload={activePayload} />
 

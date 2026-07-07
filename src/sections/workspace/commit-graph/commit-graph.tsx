@@ -206,7 +206,7 @@ export function CommitGraph({
             `<circle cx="${x}" cy="${y}" r="${r}" fill="hsl(${c.hu} 45% 55%)" stroke="${color}" stroke-width="2"/>`,
           );
           graph.push(
-            `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="middle" font-size="${r * 0.72}" font-weight="700" fill="#fff" font-family="Open Sans, Arial, sans-serif">${esc(c.i)}</text>`,
+            `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="middle" font-size="${r * 0.72}" font-weight="700" fill="#fff" font-family="'Inter Variable', Inter, sans-serif">${esc(c.i)}</text>`,
           );
         }
       }
@@ -248,15 +248,14 @@ export function CommitGraph({
         sx={{
           display: "grid",
           gridTemplateColumns: `${labelsW}px ${graphW}px 1fr`,
-          height: 28,
+          height: 22,
           bgcolor: "background.paper",
-          borderBottom: "1px solid",
-          borderColor: "divider",
-          fontSize: 9.5,
+          fontSize: 8.5,
           letterSpacing: "0.08em",
           color: "text.secondary",
           textTransform: "uppercase",
           userSelect: "none",
+          opacity: 0.8,
         }}
       >
         {/* Branch / Tag — resizable */}
@@ -306,8 +305,7 @@ export function CommitGraph({
             alignItems: "center",
             overflow: "hidden",
             whiteSpace: "nowrap",
-            borderLeft: "1px solid",
-            borderColor: "divider",
+            borderLeft: "1px solid #383b41",
           }}
         >
           Graph
@@ -321,8 +319,7 @@ export function CommitGraph({
             alignItems: "center",
             overflow: "hidden",
             whiteSpace: "nowrap",
-            borderLeft: "1px solid",
-            borderColor: "divider",
+            borderLeft: "1px solid #383b41",
           }}
         >
           Commit Message

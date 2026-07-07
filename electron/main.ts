@@ -492,11 +492,17 @@ async function buildPayload(repoPath: string, maxCommits = MAX_COMMITS) {
   }));
   const avatars = await fetchAvatars(avatarInput, repo);
 
+  let remoteUrl = '';
+  try {
+    remoteUrl = runGit(repo, 'remote', 'get-url', 'origin').trim();
+  } catch {}
+
   return {
     repoPath: repo, repoName,
     currentBranch, headHash,
     wip, commits: slim, edges,
     maxLanes, palette: PALETTE, avatars,
+    remoteUrl,
   };
 }
 
@@ -611,10 +617,12 @@ ipcMain.handle('git-pull', async (_event, repoPath: string, mode?: 'default' | '
   }
 });
 
-ipcMain.handle('git-branch', async (_event, repoPath: string, name: string) => {
+ipcMain.handle('git-branch', async (_event, repoPath: string, name: string, startPoint?: string) => {
   try {
     const repo = resolveRepoRoot(repoPath);
-    runGit(repo, 'checkout', '-b', name);
+    const args = ['checkout', '-b', name];
+    if (startPoint) args.push(startPoint);
+    runGit(repo, ...args);
     const payload = await buildPayload(repo);
     return { payload };
   } catch (err: any) {
@@ -741,6 +749,133 @@ ipcMain.handle('git-commit', async (_event, repoPath: string, summary: string, d
     const output = runGit(repo, ...args);
     const payload = await buildPayload(repo);
     return { payload, output: output.trim() };
+  } catch (err: any) {
+    return { error: err.message };
+  }
+});
+
+ipcMain.handle('git-checkout-branch', async (_event, repoPath: string, name: string) => {
+  try {
+    const repo = resolveRepoRoot(repoPath);
+    runGit(repo, 'checkout', name);
+    const payload = await buildPayload(repo);
+    return { payload };
+  } catch (err: any) {
+    return { error: err.message };
+  }
+});
+
+ipcMain.handle('git-merge-branch', async (_event, repoPath: string, selectedBranch: string, targetBranch: string) => {
+  try {
+    const repo = resolveRepoRoot(repoPath);
+    const current = runGit(repo, 'rev-parse', '--abbrev-ref', 'HEAD').trim();
+    if (current !== targetBranch) {
+      runGit(repo, 'checkout', targetBranch);
+    }
+    const output = runGit(repo, 'merge', selectedBranch);
+    const payload = await buildPayload(repo);
+    return { payload, output: output.trim() };
+  } catch (err: any) {
+    return { error: err.message };
+  }
+});
+
+ipcMain.handle('git-rebase-branch', async (_event, repoPath: string, selectedBranch: string, targetBranch: string, interactive?: boolean) => {
+  try {
+    const repo = resolveRepoRoot(repoPath);
+    if (interactive) {
+      const current = runGit(repo, 'rev-parse', '--abbrev-ref', 'HEAD').trim();
+      if (current !== selectedBranch) {
+        runGit(repo, 'checkout', selectedBranch);
+      }
+      const output = runGit(repo, 'rebase', targetBranch);
+      const payload = await buildPayload(repo);
+      return { payload, output: `[Interactive Rebase Mocked] ${output.trim()}` };
+    }
+    const current = runGit(repo, 'rev-parse', '--abbrev-ref', 'HEAD').trim();
+    if (current !== selectedBranch) {
+      runGit(repo, 'checkout', selectedBranch);
+    }
+    const output = runGit(repo, 'rebase', targetBranch);
+    const payload = await buildPayload(repo);
+    return { payload, output: output.trim() };
+  } catch (err: any) {
+    return { error: err.message };
+  }
+});
+
+ipcMain.handle('git-delete-branch', async (_event, repoPath: string, name: string, local: boolean, remote: boolean) => {
+  try {
+    const repo = resolveRepoRoot(repoPath);
+    let errorMsg = '';
+    if (local) {
+      try {
+        runGit(repo, 'branch', '-D', name);
+      } catch (err: any) {
+        errorMsg += `Local: ${err.message}. `;
+      }
+    }
+    if (remote) {
+      try {
+        const remoteBranch = name.replace(/^origin\//, '');
+        runGit(repo, 'push', 'origin', '--delete', remoteBranch);
+      } catch (err: any) {
+        errorMsg += `Remote: ${err.message}. `;
+      }
+    }
+    if (errorMsg) {
+      throw new Error(errorMsg);
+    }
+    const payload = await buildPayload(repo);
+    return { payload };
+  } catch (err: any) {
+    return { error: err.message };
+  }
+});
+
+ipcMain.handle('git-rename-branch', async (_event, repoPath: string, oldName: string, newName: string) => {
+  try {
+    const repo = resolveRepoRoot(repoPath);
+    runGit(repo, 'branch', '-m', oldName, newName);
+    const payload = await buildPayload(repo);
+    return { payload };
+  } catch (err: any) {
+    return { error: err.message };
+  }
+});
+
+ipcMain.handle('git-reset-commit', async (_event, repoPath: string, branchName: string, commitHash: string, mode: 'soft' | 'mixed' | 'hard') => {
+  try {
+    const repo = resolveRepoRoot(repoPath);
+    const current = runGit(repo, 'rev-parse', '--abbrev-ref', 'HEAD').trim();
+    if (current !== branchName) {
+      runGit(repo, 'checkout', branchName);
+    }
+    runGit(repo, 'reset', `--${mode}`, commitHash);
+    const payload = await buildPayload(repo);
+    return { payload };
+  } catch (err: any) {
+    return { error: err.message };
+  }
+});
+
+ipcMain.handle('git-revert-commit', async (_event, repoPath: string, commitHash: string) => {
+  try {
+    const repo = resolveRepoRoot(repoPath);
+    runGit(repo, 'revert', '--no-edit', commitHash);
+    const payload = await buildPayload(repo);
+    return { payload };
+  } catch (err: any) {
+    return { error: err.message };
+  }
+});
+
+ipcMain.handle('git-cherry-pick-commit', async (_event, repoPath: string, commitHash: string) => {
+  try {
+    const repo = resolveRepoRoot(repoPath);
+    runGit(repo, 'cherry-pick', commitHash);
+    const payload = await buildPayload(repo);
+    return { payload };
   } catch (err: any) {
     return { error: err.message };
   }

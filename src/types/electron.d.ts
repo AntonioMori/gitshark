@@ -43,7 +43,7 @@ export interface ElectronAPI {
   pickFolder: () => Promise<{ cancelled?: boolean; path?: string }>;
   loadRepo: (path: string, maxCommits?: number) => Promise<RepoPayload | { error: string }>;
   gitPull: (repoPath: string, mode?: PullMode) => Promise<GitPullResult>;
-  gitBranch: (repoPath: string, name: string) => Promise<GitBranchResult>;
+  gitBranch: (repoPath: string, name: string, startPoint?: string) => Promise<GitBranchResult>;
   gitPush: (repoPath: string) => Promise<GitPushResult>;
   gitStatusFiles: (repoPath: string) => Promise<GitStatusFilesResult>;
   gitStageFile: (repoPath: string, filePath: string) => Promise<{ error?: string }>;
@@ -52,6 +52,14 @@ export interface ElectronAPI {
   gitUnstageFile: (repoPath: string, filePath: string) => Promise<{ error?: string }>;
   gitCommitFiles: (repoPath: string, hash: string) => Promise<GitCommitFilesResult>;
   gitCommit: (repoPath: string, summary: string, description: string) => Promise<GitCommitResult>;
+  gitCheckoutBranch: (repoPath: string, name: string) => Promise<{ payload?: RepoPayload; error?: string }>;
+  gitMergeBranch: (repoPath: string, selectedBranch: string, targetBranch: string) => Promise<{ payload?: RepoPayload; output?: string; error?: string }>;
+  gitRebaseBranch: (repoPath: string, selectedBranch: string, targetBranch: string, interactive?: boolean) => Promise<{ payload?: RepoPayload; output?: string; error?: string }>;
+  gitDeleteBranch: (repoPath: string, name: string, local: boolean, remote: boolean) => Promise<{ payload?: RepoPayload; error?: string }>;
+  gitRenameBranch: (repoPath: string, oldName: string, newName: string) => Promise<{ payload?: RepoPayload; error?: string }>;
+  gitResetCommit: (repoPath: string, branchName: string, commitHash: string, mode: 'soft' | 'mixed' | 'hard') => Promise<{ payload?: RepoPayload; error?: string }>;
+  gitRevertCommit: (repoPath: string, commitHash: string) => Promise<{ payload?: RepoPayload; error?: string }>;
+  gitCherryPickCommit: (repoPath: string, commitHash: string) => Promise<{ payload?: RepoPayload; error?: string }>;
   onRepoChanged: (cb: (repoPath: string) => void) => () => void;
   winMinimize: () => void;
   winMaximize: () => void;
@@ -105,6 +113,7 @@ export interface RepoPayload {
   maxLanes: number;
   palette: string[];
   avatars: Record<string, string>; // md5 → data:image URL
+  remoteUrl?: string;
 }
 
 declare global {

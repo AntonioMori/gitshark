@@ -763,6 +763,9 @@ export default {
   "mdi:chevron-down": {
     body: '<path fill="currentColor" d="M7.41 8.58L12 13.17l4.59-4.59L18 10l-6 6l-6-6z"/>',
   },
+  "mdi:chevron-up": {
+    body: '<path fill="currentColor" d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6l-6 6z"/>',
+  },
   "mdi:chevron-right": {
     body: '<path fill="currentColor" d="M8.59 16.58L13.17 12L8.59 7.41L10 6l6 6l-6 6z"/>',
   },

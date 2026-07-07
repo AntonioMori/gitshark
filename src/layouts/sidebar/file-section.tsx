@@ -18,9 +18,11 @@ type Props = {
   title: string;
   files: FileStatus[];
   staged?: boolean;
+  selectedFile?: string | null;
   open: boolean;
   onToggle: () => void;
   onFileClick: (p: string) => void;
+  onSelectFile?: (p: string) => void;
   onActionAll: () => void;
   actionBtn: ReactNode;
   viewMode: "path" | "tree";
@@ -33,9 +35,11 @@ export function FileSection({
   title,
   files,
   staged,
+  selectedFile,
   open,
   onToggle,
   onFileClick,
+  onSelectFile,
   onActionAll,
   actionBtn,
   viewMode,
@@ -130,7 +134,9 @@ export function FileSection({
                   key={f.path}
                   file={f}
                   staged={staged}
+                  selected={selectedFile === f.path}
                   onClick={() => onFileClick(f.path)}
+                  onSelect={onSelectFile ? () => onSelectFile(f.path) : undefined}
                 />
               ))
             : tree.map((n) => (
@@ -139,9 +145,11 @@ export function FileSection({
                   node={n}
                   depth={0}
                   staged={staged}
+                  selectedFile={selectedFile}
                   collapsedDirs={collapsedDirs}
                   onToggleDir={onToggleDir}
                   onFileClick={onFileClick}
+                  onSelectFile={onSelectFile}
                 />
               ))}
         </Box>

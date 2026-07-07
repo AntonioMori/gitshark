@@ -14,6 +14,8 @@ import { CommitGraph } from 'src/sections/workspace/commit-graph/commit-graph';
 import { StatusBar } from 'src/sections/workspace/status-bar';
 import { CommitSidebar } from './commit-sidebar';
 import { CommitDetail } from './sidebar/commit-detail';
+import { DiffViewer } from 'src/sections/workspace/diff-viewer/diff-viewer';
+import type { DiffContext } from 'src/sections/workspace/diff-viewer/diff-viewer';
 
 // ----------------------------------------------------------------------
 
@@ -34,6 +36,7 @@ export function GitSharkLayout() {
   const [pulling, setPulling] = useState(false);
   const [pushing, setPushing] = useState(false);
   const [creatingBranch, setCreatingBranch] = useState(false);
+  const [diffTarget, setDiffTarget] = useState<{ path: string; context: DiffContext; commitHash?: string } | null>(null);
 
   const showToast = useCallback((msg: string) => {
     if (msg.toLowerCase().includes('erro') || msg.toLowerCase().includes('não foi') || msg.toLowerCase().includes('máximo')) {
@@ -195,6 +198,7 @@ export function GitSharkLayout() {
   }, [activeTab]);
 
   const closeDetail = useCallback(() => {
+    setDiffTarget(null);
     setTabs((prev) => {
       const updated = [...prev];
       const tab = updated[activeTab];
@@ -203,6 +207,14 @@ export function GitSharkLayout() {
       return updated;
     });
   }, [activeTab]);
+
+  const handleSelectFileForDiff = useCallback((path: string, context: DiffContext, commitHash?: string) => {
+    setDiffTarget({ path, context, commitHash });
+  }, []);
+
+  const closeDiff = useCallback(() => {
+    setDiffTarget(null);
+  }, []);
 
   // --- Pull ---
   const handlePull = useCallback(async (mode: PullMode) => {
@@ -305,7 +317,15 @@ export function GitSharkLayout() {
       {/* Workspace */}
       <Box sx={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         <Box sx={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-          {activePayload ? (
+          {activePayload && diffTarget ? (
+            <DiffViewer
+              repoPath={activePayload.repoPath}
+              filePath={diffTarget.path}
+              context={diffTarget.context}
+              commitHash={diffTarget.commitHash}
+              onClose={closeDiff}
+            />
+          ) : activePayload ? (
             <CommitGraph
               payload={activePayload}
               selectedIdx={activeSelected}
@@ -325,9 +345,16 @@ export function GitSharkLayout() {
               commit={activeCommit}
               payload={activePayload}
               onClose={closeDetail}
+              selectedFile={diffTarget?.path}
+              onSelectFile={(path) => handleSelectFileForDiff(path, 'commit', activeCommit.h)}
             />
           ) : (
-            <CommitSidebar payload={activePayload} onRefresh={handleRefresh} />
+            <CommitSidebar
+              payload={activePayload}
+              onRefresh={handleRefresh}
+              selectedFile={diffTarget?.path}
+              onSelectFile={(path, ctx) => handleSelectFileForDiff(path, ctx)}
+            />
           )
         )}
       </Box>

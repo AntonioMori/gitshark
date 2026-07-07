@@ -1,4 +1,5 @@
-import { useRef, useMemo, useCallback, useState } from "react";
+import { useRef, useMemo, useCallback, useState, cloneElement } from "react";
+import { Iconify } from "src/components/iconify";
 
 import Box from "@mui/material/Box";
 import Menu from "@mui/material/Menu";
@@ -53,6 +54,7 @@ export function CommitGraph({
   } | null>(null);
 
   const [resetSubMenuAnchor, setResetSubMenuAnchor] = useState<null | HTMLElement>(null);
+  const [checkoutSubMenuAnchor, setCheckoutSubMenuAnchor] = useState<null | HTMLElement>(null);
 
   const handleRefContextMenu = useCallback((e: React.MouseEvent, ref: RepoRef, commitHash: string) => {
     const isBranch = ref.type === 'branch' || ref.type === 'head_branch' || ref.type === 'remote';
@@ -184,24 +186,65 @@ export function CommitGraph({
 
   const handleCheckout = async (mode: 'local' | 'track' | 'detached' = 'local') => {
     if (!contextMenu) return;
-    const name = contextMenu.ref.name;
+    let name = contextMenu.ref.name;
     const commitHash = contextMenu.commitHash;
     setContextMenu(null);
+    setCheckoutSubMenuAnchor(null);
+
+    let finalMode = mode;
+    let shouldPullAfterCheckout = false;
+    if (mode === 'track') {
+      const localName = name.split('/').slice(1).join('/');
+      const localExists = payload.commits.some((c) =>
+        c.r.some((r) => (r.type === 'branch' || r.type === 'head_branch') && r.name === localName)
+      );
+      if (localExists) {
+        finalMode = 'local';
+        name = localName;
+        shouldPullAfterCheckout = true;
+      }
+    }
+
+    const toastId = shouldPullAfterCheckout ? toast.loading(`Fazendo checkout de '${name}' e atualizando com o remote...`) : undefined;
+
     try {
-      const result = await window.api.gitCheckoutBranch(payload.repoPath, name, mode, commitHash);
+      const result = await window.api.gitCheckoutBranch(payload.repoPath, name, finalMode, commitHash);
       if (result.error) {
+        if (toastId) toast.dismiss(toastId);
         toast.error(result.error);
       } else if (result.payload) {
-        onRefresh?.(result.payload);
-        if (mode === 'detached') {
-          toast.success(`Checkout do commit ${commitHash.slice(0, 7)} (detached HEAD).`);
-        } else if (mode === 'track') {
-          toast.success(`Branch local '${name.replace(/^origin\//, '')}' criada com tracking de '${name}'.`);
+        let currentPayload = result.payload;
+
+        if (shouldPullAfterCheckout) {
+          try {
+            const pullResult = await window.api.gitPull(payload.repoPath, 'default');
+            if (toastId) toast.dismiss(toastId);
+            if (pullResult.error) {
+              toast.warning(`Checkout de '${name}' realizado, mas falhou ao puxar alterações do remote: ${pullResult.error}`);
+            } else {
+              toast.success(`Checkout de '${name}' realizado e sincronizado com o remote.`);
+            }
+            if (pullResult.payload) {
+              currentPayload = pullResult.payload;
+            }
+          } catch (pullErr: any) {
+            if (toastId) toast.dismiss(toastId);
+            toast.warning(`Checkout de '${name}' realizado, mas falhou ao puxar alterações: ${pullErr.message}`);
+          }
         } else {
-          toast.success(`Checkout de '${name}' realizado.`);
+          if (finalMode === 'detached') {
+            toast.success(`Checkout do commit ${commitHash.slice(0, 7)} (detached HEAD).`);
+          } else if (finalMode === 'track') {
+            toast.success(`Branch local '${name.split('/').slice(1).join('/')}' criada com tracking de '${name}'.`);
+          } else {
+            toast.success(`Checkout de '${name}' realizado.`);
+          }
         }
+
+        onRefresh?.(currentPayload);
       }
     } catch (err: any) {
+      if (toastId) toast.dismiss(toastId);
       toast.error(`Erro ao fazer checkout: ${err.message}`);
     }
   };
@@ -879,7 +922,11 @@ export function CommitGraph({
       {/* Context Menu */}
       <Menu
         open={contextMenu !== null}
-        onClose={() => setContextMenu(null)}
+        onClose={() => {
+          setContextMenu(null);
+          setResetSubMenuAnchor(null);
+          setCheckoutSubMenuAnchor(null);
+        }}
         anchorReference="anchorPosition"
         anchorPosition={
           contextMenu !== null
@@ -895,6 +942,12 @@ export function CommitGraph({
               boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
               py: 0.5,
               minWidth: 280,
+              scrollbarWidth: 'none',
+              '&::-webkit-scrollbar': { display: 'none' },
+              '& .MuiList-root': {
+                scrollbarWidth: 'none',
+                '&::-webkit-scrollbar': { display: 'none' }
+              }
             }
           }
         }}
@@ -920,7 +973,7 @@ export function CommitGraph({
             }
           };
 
-          return [
+          const items = [
             // --- Section 1: Sincronização com o Repositório Remoto ---
             <MenuItem key="pull" onClick={() => handlePull('default')} sx={menuStyle}>
               Pull (fast-forward if possible)
@@ -959,18 +1012,22 @@ export function CommitGraph({
             !isCurrent ? <Divider key="div2" sx={{ my: 0.5, borderColor: '#363635' }} /> : null,
 
             // --- Section 3: Checkout ---
-            !isCurrent && !isRemote ? (
-              <MenuItem key="checkout-local" onClick={() => handleCheckout('local')} sx={menuStyle}>
-                Checkout {selectedBranch}
-              </MenuItem>
-            ) : null,
-            !isCurrent && isRemote ? (
-              <MenuItem key="checkout-track" onClick={() => handleCheckout('track')} sx={menuStyle}>
-                Checkout {localName} (track {selectedBranch})
-              </MenuItem>
-            ) : null,
-            <MenuItem key="checkout-commit" onClick={() => handleCheckout('detached')} sx={menuStyle}>
-              Checkout this commit ({shortHash})
+            <MenuItem
+              key="checkout-sub"
+              onMouseEnter={(e) => {
+                setCheckoutSubMenuAnchor(e.currentTarget);
+                setResetSubMenuAnchor(null);
+              }}
+              onClick={(e) => setCheckoutSubMenuAnchor(e.currentTarget)}
+              sx={{
+                ...menuStyle,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <span>Checkout</span>
+              <Iconify icon="eva:arrow-ios-forward-fill" width={16} sx={{ opacity: 0.7 }} />
             </MenuItem>,
 
             !isCurrent ? <Divider key="div3" sx={{ my: 0.5, borderColor: '#363635' }} /> : null,
@@ -984,6 +1041,10 @@ export function CommitGraph({
             </MenuItem>,
             <MenuItem
               key="reset-sub"
+              onMouseEnter={(e) => {
+                setResetSubMenuAnchor(e.currentTarget);
+                setCheckoutSubMenuAnchor(null);
+              }}
               onClick={(e) => setResetSubMenuAnchor(e.currentTarget)}
               sx={{
                 ...menuStyle,
@@ -993,7 +1054,7 @@ export function CommitGraph({
               }}
             >
               <span>Reset {selectedBranch} to this commit</span>
-              <span style={{ fontSize: 10, opacity: 0.7 }}>▶</span>
+              <Iconify icon="eva:arrow-ios-forward-fill" width={16} sx={{ opacity: 0.7 }} />
             </MenuItem>,
             <MenuItem key="revert" onClick={handleRevert} sx={menuStyle}>
               Revert commit
@@ -1054,7 +1115,26 @@ export function CommitGraph({
             <MenuItem key="share-patch" onClick={handleShareCloudPatch} sx={menuStyle}>
               Share commit as Cloud Patch
             </MenuItem>,
-          ].filter(Boolean);
+          ];
+
+          return items.filter(Boolean).map((item: any) => {
+            if (!item) return item;
+            if (item.key === 'checkout-sub' || item.key === 'reset-sub') {
+              return item;
+            }
+            if (item.type === MenuItem) {
+              return cloneElement(item, {
+                onMouseEnter: (e: any) => {
+                  setCheckoutSubMenuAnchor(null);
+                  setResetSubMenuAnchor(null);
+                  if (item.props && item.props.onMouseEnter) {
+                    item.props.onMouseEnter(e);
+                  }
+                }
+              });
+            }
+            return item;
+          });
         })()}
       </Menu>
 
@@ -1065,15 +1145,28 @@ export function CommitGraph({
         onClose={() => setResetSubMenuAnchor(null)}
         anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
         transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+        style={{ pointerEvents: 'none' }}
+        disableAutoFocus
+        disableEnforceFocus
         slotProps={{
+          backdrop: {
+            sx: { pointerEvents: 'none' }
+          },
           paper: {
             sx: {
+              pointerEvents: 'auto',
               bgcolor: '#1f1f1f',
               color: '#bdbec3',
               border: '1px solid #363635',
               boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
               py: 0.5,
               minWidth: 180,
+              scrollbarWidth: 'none',
+              '&::-webkit-scrollbar': { display: 'none' },
+              '& .MuiList-root': {
+                scrollbarWidth: 'none',
+                '&::-webkit-scrollbar': { display: 'none' }
+              }
             }
           }
         }}
@@ -1117,6 +1210,116 @@ export function CommitGraph({
         >
           Hard (discard all changes)
         </MenuItem>
+      </Menu>
+
+      {/* Checkout Submenu */}
+      <Menu
+        open={checkoutSubMenuAnchor !== null}
+        anchorEl={checkoutSubMenuAnchor}
+        onClose={() => setCheckoutSubMenuAnchor(null)}
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+        style={{ pointerEvents: 'none' }}
+        disableAutoFocus
+        disableEnforceFocus
+        slotProps={{
+          backdrop: {
+            sx: { pointerEvents: 'none' }
+          },
+          paper: {
+            sx: {
+              pointerEvents: 'auto',
+              bgcolor: '#1f1f1f',
+              color: '#bdbec3',
+              border: '1px solid #363635',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+              py: 0.5,
+              minWidth: 180,
+              scrollbarWidth: 'none',
+              '&::-webkit-scrollbar': { display: 'none' },
+              '& .MuiList-root': {
+                scrollbarWidth: 'none',
+                '&::-webkit-scrollbar': { display: 'none' }
+              }
+            }
+          }
+        }}
+      >
+        {contextMenu && (() => {
+          const selectedBranch = contextMenu.ref.name;
+          const currentBranch = payload.currentBranch;
+          const isCurrent = selectedBranch === currentBranch;
+          const isBranch = contextMenu.ref.type === 'branch' || contextMenu.ref.type === 'head_branch';
+          const isRemote = contextMenu.ref.type === 'remote';
+          const isTag = contextMenu.ref.type === 'tag';
+          const shortHash = contextMenu.commitHash.slice(0, 7);
+          const localName = selectedBranch.split('/').slice(1).join('/');
+
+          return [
+            isBranch && !isCurrent ? (
+              <MenuItem
+                key="checkout-local"
+                onClick={() => handleCheckout('local')}
+                sx={{
+                  fontSize: 12.5,
+                  py: 0.75,
+                  px: 2,
+                  color: '#bdbec3',
+                  fontFamily: FONT,
+                  '&:hover': { bgcolor: '#363635', color: '#fff' }
+                }}
+              >
+                Checkout local branch '{selectedBranch}'
+              </MenuItem>
+            ) : null,
+            isRemote ? (
+              <MenuItem
+                key="checkout-track"
+                onClick={() => handleCheckout('track')}
+                sx={{
+                  fontSize: 12.5,
+                  py: 0.75,
+                  px: 2,
+                  color: '#bdbec3',
+                  fontFamily: FONT,
+                  '&:hover': { bgcolor: '#363635', color: '#fff' }
+                }}
+              >
+                Checkout '{localName}' (track '{selectedBranch}')
+              </MenuItem>
+            ) : null,
+            isTag ? (
+              <MenuItem
+                key="checkout-tag"
+                onClick={() => handleCheckout('local')}
+                sx={{
+                  fontSize: 12.5,
+                  py: 0.75,
+                  px: 2,
+                  color: '#bdbec3',
+                  fontFamily: FONT,
+                  '&:hover': { bgcolor: '#363635', color: '#fff' }
+                }}
+              >
+                Checkout tag '{selectedBranch}' (detached)
+              </MenuItem>
+            ) : null,
+            <MenuItem
+              key="checkout-commit"
+              onClick={() => handleCheckout('detached')}
+              sx={{
+                fontSize: 12.5,
+                py: 0.75,
+                px: 2,
+                color: '#bdbec3',
+                fontFamily: FONT,
+                '&:hover': { bgcolor: '#363635', color: '#fff' }
+              }}
+            >
+              Checkout commit '{shortHash}' (detached HEAD)
+            </MenuItem>
+          ].filter(Boolean);
+        })()}
       </Menu>
     </Box>
   );

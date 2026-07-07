@@ -27,9 +27,11 @@ type Props = {
   commit: SlimCommit;
   payload: RepoPayload;
   onClose: () => void;
+  onSelectFile?: (path: string) => void;
+  selectedFile?: string | null;
 };
 
-export function CommitDetail({ commit, payload, onClose }: Props) {
+export function CommitDetail({ commit, payload, onClose, onSelectFile, selectedFile }: Props) {
   const [viewMode, setViewMode] = useState<"path" | "tree">("path");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [collapsedDirs, setCollapsedDirs] = useState<Set<string>>(new Set());
@@ -178,7 +180,7 @@ export function CommitDetail({ commit, payload, onClose }: Props) {
           sx={{ ...iconBtn, flexShrink: 0 }}
           title="Fechar"
         >
-          <Iconify icon="solar:close-circle-bold" width={15} />
+          <Iconify icon="mingcute:close-line" width={15} />
         </Box>
       </Box>
 
@@ -390,16 +392,25 @@ export function CommitDetail({ commit, payload, onClose }: Props) {
               Nenhum arquivo alterado.
             </Typography>
           ) : viewMode === "path" ? (
-            sorted.map((f) => <DetailFileItem key={f.path} file={f} />)
+            sorted.map((f) => (
+              <DetailFileItem
+                key={f.path}
+                file={f}
+                selected={selectedFile === f.path}
+                onSelect={onSelectFile ? () => onSelectFile(f.path) : undefined}
+              />
+            ))
           ) : (
             tree.map((n) => (
               <TreeNodeView
                 key={n.fullPath}
                 node={n}
                 depth={0}
+                selectedFile={selectedFile}
                 collapsedDirs={collapsedDirs}
                 onToggleDir={toggleDir}
                 onFileClick={() => {}}
+                onSelectFile={onSelectFile}
               />
             ))
           )}
@@ -411,7 +422,7 @@ export function CommitDetail({ commit, payload, onClose }: Props) {
 
 // ----------------------------------------------------------------------
 
-function DetailFileItem({ file }: { file: FileStatus }) {
+function DetailFileItem({ file, selected, onSelect }: { file: FileStatus; selected?: boolean; onSelect?: () => void }) {
   const info = STATUS_ICON[file.status] ?? STATUS_ICON["?"];
   const normalized = file.path.replace(/\\/g, "/");
   const slash = normalized.lastIndexOf("/");
@@ -420,6 +431,7 @@ function DetailFileItem({ file }: { file: FileStatus }) {
 
   return (
     <Box
+      onClick={onSelect}
       sx={{
         display: "flex",
         alignItems: "center",
@@ -430,7 +442,8 @@ function DetailFileItem({ file }: { file: FileStatus }) {
         overflow: "hidden",
         minWidth: 0,
         cursor: "pointer",
-        "&:hover": { bgcolor: "#2b3446" },
+        bgcolor: selected ? "rgba(91,155,213,0.15)" : "transparent",
+        "&:hover": { bgcolor: selected ? "rgba(91,155,213,0.2)" : "#2b3446" },
       }}
     >
       <Iconify

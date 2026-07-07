@@ -39,6 +39,11 @@ export interface GitCommitFilesResult {
   error?: string;
 }
 
+export interface GitDiffFileResult {
+  diff: string;
+  error?: string;
+}
+
 export interface ElectronAPI {
   pickFolder: () => Promise<{ cancelled?: boolean; path?: string }>;
   loadRepo: (path: string, maxCommits?: number) => Promise<RepoPayload | { error: string }>;
@@ -51,6 +56,7 @@ export interface ElectronAPI {
   gitDiscardAll: (repoPath: string) => Promise<{ error?: string }>;
   gitUnstageFile: (repoPath: string, filePath: string) => Promise<{ error?: string }>;
   gitCommitFiles: (repoPath: string, hash: string) => Promise<GitCommitFilesResult>;
+  gitDiffFile: (repoPath: string, filePath: string, context: 'staged' | 'unstaged' | 'commit', commitHash?: string) => Promise<GitDiffFileResult>;
   gitCommit: (repoPath: string, summary: string, description: string) => Promise<GitCommitResult>;
   gitCheckoutBranch: (repoPath: string, name: string, mode?: 'local' | 'track' | 'detached', commitHash?: string) => Promise<{ payload?: RepoPayload; error?: string }>;
   gitMergeBranch: (repoPath: string, selectedBranch: string, targetBranch: string) => Promise<{ payload?: RepoPayload; output?: string; error?: string }>;

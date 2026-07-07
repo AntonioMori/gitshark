@@ -96,7 +96,7 @@ function collectRepoData(repo: string, maxCommits: number) {
 
   const wip: any = { modified: 0, added: 0, deleted: 0, untracked: 0 };
   try {
-    for (const line of runGit(repo, 'status', '--porcelain').split('\n')) {
+    for (const line of runGit(repo, '-c', 'core.quotepath=false', 'status', '--porcelain', '-u').split('\n')) {
       if (!line) continue;
       const code = line.slice(0, 2);
       if (code.startsWith('??')) wip.untracked++;
@@ -658,7 +658,7 @@ ipcMain.handle('git-push', async (_event, repoPath: string) => {
 ipcMain.handle('git-status-files', async (_event, repoPath: string) => {
   try {
     const repo = resolveRepoRoot(repoPath);
-    const raw = runGit(repo, 'status', '--porcelain');
+    const raw = runGit(repo, '-c', 'core.quotepath=false', 'status', '--porcelain', '-u');
     const staged: { path: string; status: string }[] = [];
     const unstaged: { path: string; status: string }[] = [];
     for (const line of raw.split('\n')) {
@@ -668,6 +668,9 @@ ipcMain.handle('git-status-files', async (_event, repoPath: string) => {
       let filePath = line.slice(3);
       if (filePath.includes(' -> ')) filePath = filePath.split(' -> ')[1];
       filePath = filePath.trim();
+      if (filePath.startsWith('"') && filePath.endsWith('"')) {
+        filePath = filePath.slice(1, -1);
+      }
       if (!filePath) continue;
       if (X !== ' ' && X !== '?') staged.push({ path: filePath, status: X });
       if (Y !== ' ' || X === '?') unstaged.push({ path: filePath, status: X === '?' ? '?' : Y });
@@ -760,8 +763,16 @@ ipcMain.handle('git-checkout-branch', async (_event, repoPath: string, name: str
     if (mode === 'detached') {
       runGit(repo, 'checkout', '--detach', commitHash || name);
     } else if (mode === 'track') {
-      const localName = name.replace(/^origin\//, '');
-      runGit(repo, 'checkout', '-b', localName, name);
+      const localName = name.split('/').slice(1).join('/');
+      try {
+        runGit(repo, 'checkout', '-b', localName, name);
+      } catch (err: any) {
+        try {
+          runGit(repo, 'checkout', localName);
+        } catch {
+          throw err;
+        }
+      }
     } else {
       runGit(repo, 'checkout', name);
     }
@@ -885,6 +896,60 @@ ipcMain.handle('git-cherry-pick-commit', async (_event, repoPath: string, commit
     return { payload };
   } catch (err: any) {
     return { error: err.message };
+  }
+});
+
+ipcMain.handle('git-diff-file', async (_event, repoPath: string, filePath: string, context: 'staged' | 'unstaged' | 'commit', commitHash?: string) => {
+  try {
+    const repo = resolveRepoRoot(repoPath);
+    let diff = '';
+    if (context === 'unstaged') {
+      // Try normal diff first
+      diff = runGit(repo, 'diff', '-U99999', '--', filePath);
+      // If empty, file might be untracked — generate a synthetic all-added diff
+      if (!diff.trim()) {
+        const absPath = path.join(repo, filePath);
+        if (fs.existsSync(absPath)) {
+          const content = fs.readFileSync(absPath, 'utf-8');
+          const lines = content.split('\n');
+          // Remove trailing empty line from split
+          if (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
+          diff = `diff --git a/${filePath} b/${filePath}\nnew file mode 100644\n--- /dev/null\n+++ b/${filePath}\n@@ -0,0 +1,${lines.length} @@\n${lines.map(l => '+' + l).join('\n')}\n`;
+        }
+      }
+    } else if (context === 'staged') {
+      diff = runGit(repo, 'diff', '--cached', '-U99999', '--', filePath);
+      // If empty, file might be newly staged (status A) — diff HEAD vs index
+      if (!diff.trim()) {
+        try {
+          const content = runGit(repo, 'show', `:${filePath}`);
+          const lines = content.split('\n');
+          if (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
+          diff = `diff --git a/${filePath} b/${filePath}\nnew file mode 100644\n--- /dev/null\n+++ b/${filePath}\n@@ -0,0 +1,${lines.length} @@\n${lines.map(l => '+' + l).join('\n')}\n`;
+        } catch { /* ignore */ }
+      }
+    } else if (context === 'commit' && commitHash) {
+      let isRoot = false;
+      try {
+        runGit(repo, 'rev-parse', `${commitHash}^`);
+      } catch {
+        isRoot = true;
+      }
+      if (isRoot) {
+        // Root commit — show entire file as added
+        try {
+          const content = runGit(repo, 'show', `${commitHash}:${filePath}`);
+          const lines = content.split('\n');
+          if (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
+          diff = `diff --git a/${filePath} b/${filePath}\nnew file mode 100644\n--- /dev/null\n+++ b/${filePath}\n@@ -0,0 +1,${lines.length} @@\n${lines.map(l => '+' + l).join('\n')}\n`;
+        } catch { /* ignore */ }
+      } else {
+        diff = runGit(repo, 'diff', '-U99999', `${commitHash}^`, commitHash, '--', filePath);
+      }
+    }
+    return { diff };
+  } catch (err: any) {
+    return { error: err.message, diff: '' };
   }
 });
 

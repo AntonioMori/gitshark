@@ -21,6 +21,7 @@ contextBridge.exposeInMainWorld('api', {
   gitResetCommit: (repoPath: string, branchName: string, commitHash: string, mode: 'soft' | 'mixed' | 'hard') => ipcRenderer.invoke('git-reset-commit', repoPath, branchName, commitHash, mode),
   gitRevertCommit: (repoPath: string, commitHash: string) => ipcRenderer.invoke('git-revert-commit', repoPath, commitHash),
   gitCherryPickCommit: (repoPath: string, commitHash: string) => ipcRenderer.invoke('git-cherry-pick-commit', repoPath, commitHash),
+  gitDiffFile: (repoPath: string, filePath: string, context: 'staged' | 'unstaged' | 'commit', commitHash?: string) => ipcRenderer.invoke('git-diff-file', repoPath, filePath, context, commitHash),
   onRepoChanged: (cb: (repoPath: string) => void) => {
     const handler = (_: Electron.IpcRendererEvent, repoPath: string) => cb(repoPath);
     ipcRenderer.on('repo-changed', handler);

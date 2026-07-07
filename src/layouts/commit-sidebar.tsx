@@ -80,9 +80,11 @@ const UnstageAllBtn = (
 type Props = {
   payload: RepoPayload;
   onRefresh: (newPayload: RepoPayload) => void;
+  onSelectFile?: (path: string, context: 'staged' | 'unstaged') => void;
+  selectedFile?: string | null;
 };
 
-export function CommitSidebar({ payload, onRefresh }: Props) {
+export function CommitSidebar({ payload, onRefresh, onSelectFile, selectedFile }: Props) {
   const [staged, setStaged] = useState<FileStatus[]>([]);
   const [unstaged, setUnstaged] = useState<FileStatus[]>([]);
   const [unstagedOpen, setUnstagedOpen] = useState(true);
@@ -108,7 +110,7 @@ export function CommitSidebar({ payload, onRefresh }: Props) {
 
   useEffect(() => {
     loadStatus();
-  }, [loadStatus]);
+  }, [payload, loadStatus]);
 
   const handleStageAll = useCallback(async () => {
     await window.api.gitStageAll(payload.repoPath);
@@ -400,9 +402,11 @@ export function CommitSidebar({ payload, onRefresh }: Props) {
             <FileSection
               title="Unstaged Files"
               files={unstaged}
+              selectedFile={selectedFile}
               open={unstagedOpen}
               onToggle={() => setUnstagedOpen((v) => !v)}
               onFileClick={handleStageFile}
+              onSelectFile={onSelectFile ? (p) => onSelectFile(p, 'unstaged') : undefined}
               onActionAll={handleStageAll}
               actionBtn={StageAllBtn}
               viewMode={viewMode}
@@ -414,9 +418,11 @@ export function CommitSidebar({ payload, onRefresh }: Props) {
               title="Staged Files"
               files={staged}
               staged
+              selectedFile={selectedFile}
               open={stagedOpen}
               onToggle={() => setStagedOpen((v) => !v)}
               onFileClick={handleUnstageFile}
+              onSelectFile={onSelectFile ? (p) => onSelectFile(p, 'staged') : undefined}
               onActionAll={handleUnstageAll}
               actionBtn={UnstageAllBtn}
               viewMode={viewMode}
@@ -601,7 +607,7 @@ export function CommitSidebar({ payload, onRefresh }: Props) {
               onClick={canCommit ? handleCommit : undefined}
               sx={{
                 width: "100%",
-                py: 1,
+                py: 1.5,
                 borderRadius: "0px",
                 display: "flex",
                 alignItems: "center",
@@ -617,7 +623,7 @@ export function CommitSidebar({ payload, onRefresh }: Props) {
               }}
             >
               <Typography sx={{ fontSize: 12, color: TEXT }}>-o-</Typography>
-              <Typography sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>
+              <Typography sx={{ fontSize: 12, fontWeight: 500, color: TEXT}}>
                 {canCommit
                   ? `Commit ${staged.length} file${staged.length !== 1 ? "s" : ""}`
                   : "Stage Changes to Commit"}

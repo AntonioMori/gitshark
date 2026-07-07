@@ -215,7 +215,6 @@ export function ActionBar({
           display: "flex",
           justifyContent: "flex-end",
           alignItems: "stretch",
-          pr: 0.5,
           justifySelf: "end",
         }}
       >

@@ -12,26 +12,31 @@ type Props = {
   node: TreeNode;
   depth: number;
   staged?: boolean;
+  selectedFile?: string | null;
   collapsedDirs: Set<string>;
   onToggleDir: (p: string) => void;
   onFileClick: (p: string) => void;
+  onSelectFile?: (p: string) => void;
 };
 
 export function TreeNodeView({
   node,
   depth,
   staged,
+  selectedFile,
   collapsedDirs,
   onToggleDir,
   onFileClick,
+  onSelectFile,
 }: Props) {
   if (!node.isDir && node.file) {
     const info = STATUS_ICON[node.file.status] ?? STATUS_ICON["?"];
+    const isSelected = selectedFile === node.fullPath;
     return (
       <Box
         component="button"
-        onClick={() => onFileClick(node.fullPath)}
-        title={staged ? `Unstage: ${node.fullPath}` : `Stage: ${node.fullPath}`}
+        onClick={() => (onSelectFile ? onSelectFile(node.fullPath) : onFileClick(node.fullPath))}
+        title={node.fullPath}
         sx={{
           display: "flex",
           alignItems: "center",
@@ -40,11 +45,11 @@ export function TreeNodeView({
           pl: `${12 + depth * 14}px`,
           pr: 1.5,
           py: 0.6,
-          bgcolor: "transparent",
+          bgcolor: isSelected ? "rgba(91,155,213,0.15)" : "transparent",
           border: "none",
           cursor: "pointer",
           textAlign: "left",
-          "&:hover": { bgcolor: "#2b3446" },
+          "&:hover": { bgcolor: isSelected ? "rgba(91,155,213,0.2)" : "#2b3446" },
           outline: "none",
           overflow: "hidden",
           minWidth: 0,
@@ -110,9 +115,11 @@ export function TreeNodeView({
             node={child}
             depth={depth + 1}
             staged={staged}
+            selectedFile={selectedFile}
             collapsedDirs={collapsedDirs}
             onToggleDir={onToggleDir}
             onFileClick={onFileClick}
+            onSelectFile={onSelectFile}
           />
         ))}
     </Box>

@@ -1,3 +1,5 @@
+import type { MouseEvent } from "react";
+
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 
@@ -11,10 +13,12 @@ import { STATUS_ICON } from "./constants";
 type Props = {
   file: FileStatus;
   staged?: boolean;
+  selected?: boolean;
   onClick: () => void;
+  onSelect?: () => void;
 };
 
-export function FileItem({ file, staged, onClick }: Props) {
+export function FileItem({ file, staged, selected, onClick, onSelect }: Props) {
   const info = STATUS_ICON[file.status] ?? STATUS_ICON["?"];
   const normalized = file.path.replace(/\\/g, "/");
   const slash = normalized.lastIndexOf("/");
@@ -26,8 +30,8 @@ export function FileItem({ file, staged, onClick }: Props) {
   return (
     <Box
       component="button"
-      onClick={onClick}
-      title={isStaged ? `Unstage: ${file.path}` : `Stage: ${file.path}`}
+      onClick={onSelect || onClick}
+      title={file.path}
       sx={{
         display: "flex",
         alignItems: "center",
@@ -35,12 +39,12 @@ export function FileItem({ file, staged, onClick }: Props) {
         width: "100%",
         px: 1.5,
         py: 0.75,
-        bgcolor: "transparent",
+        bgcolor: selected ? "rgba(91,155,213,0.15)" : "transparent",
         border: "none",
         cursor: "pointer",
         textAlign: "left",
         "&:hover": {
-          bgcolor: "#2b3446",
+          bgcolor: selected ? "rgba(91,155,213,0.2)" : "#2b3446",
           "& .file-action-btn": { opacity: 1 },
         },
         outline: "none",
@@ -75,6 +79,10 @@ export function FileItem({ file, staged, onClick }: Props) {
       <Box
         component="span"
         className="file-action-btn"
+        onClick={(e: MouseEvent) => {
+          e.stopPropagation();
+          onClick();
+        }}
         sx={{
           opacity: 0,
           transition: "opacity 0.15s",

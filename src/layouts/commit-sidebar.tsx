@@ -41,12 +41,13 @@ const StageAllBtn = (
       color: "rgba(255,255,255,0.8)",
       fontWeight: 500,
       border: "1px solid #5cb85c",
-      borderRadius: "3px",
-      px: 0.75,
-      py: "2px",
+      borderRadius: "2px",
+      px: 1,
+      py: "4px",
       bgcolor: "#314739",
-      "&:hover": { bgcolor: "#477f4b" },
-      pointerEvents: "none",
+      transition: "all 0.1s",
+      "&:hover": { bgcolor: "#477f4b", borderColor: "#477f4b" },
+      pointerEvents: "auto",
     }}
   >
     Stage All Changes
@@ -60,12 +61,14 @@ const UnstageAllBtn = (
       color: "rgba(255,255,255,0.8)",
       fontWeight: 500,
       border: "1px solid #d9413d",
-      borderRadius: "3px",
-      px: 0.75,
-      py: "2px",
+      borderRadius: "2px",
+      px: 1,
+      py: "4px",
       bgcolor: "#4a2f33",
-      "&:hover": { bgcolor: "#923839" },
-      pointerEvents: "none",
+      transition: "all 0.1s",
+      "&:hover": { bgcolor: "#923839", borderColor: "#923839" },
+      pointerEvents: "auto",
+      
     }}
   >
     Unstage All
@@ -604,7 +607,7 @@ export function CommitSidebar({ payload, onRefresh }: Props) {
                 border: "1px solid #5cb85c",
                 cursor: canCommit ? "pointer" : "default",
                 outline: "none",
-                transition: "all 0.15s",
+                // transition: "all 0.15s",
                 opacity: canCommit ? 1 : 0.4,
                 "&:hover": canCommit ? { bgcolor: "#477f4b" } : {},
               }}

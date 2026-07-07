@@ -336,6 +336,18 @@ export function CommitGraph({
           overflow: "auto",
           position: "relative",
           bgcolor: "#1c1e23",
+          scrollbarWidth: "thin",
+          scrollbarColor: "rgba(255,255,255,0.12) transparent",
+          "&::-webkit-scrollbar": { width: 5, height: 5 },
+          "&::-webkit-scrollbar-track": { background: "transparent" },
+          "&::-webkit-scrollbar-thumb": {
+            background: "rgba(255,255,255,0.12)",
+            borderRadius: 3,
+          },
+          "&::-webkit-scrollbar-thumb:hover": {
+            background: "rgba(255,255,255,0.25)",
+          },
+          "&::-webkit-scrollbar-corner": { background: "transparent" },
         }}
       >
         <Box

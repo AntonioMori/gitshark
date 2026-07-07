@@ -1,403 +1,38 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
+import type { ChangeEvent } from "react";
+
 import Box from "@mui/material/Box";
-import Typography from "@mui/material/Typography";
+import Button from "@mui/material/Button";
 import Checkbox from "@mui/material/Checkbox";
 import Dialog from "@mui/material/Dialog";
-import DialogTitle from "@mui/material/DialogTitle";
-import DialogContent from "@mui/material/DialogContent";
 import DialogActions from "@mui/material/DialogActions";
-import Button from "@mui/material/Button";
+import DialogContent from "@mui/material/DialogContent";
+import DialogTitle from "@mui/material/DialogTitle";
+import Typography from "@mui/material/Typography";
+
 import { toast } from "sonner";
+
 import { Iconify } from "src/components/iconify";
-import type { IconifyName } from "src/components/iconify/register-icons";
-import type { RepoPayload, FileStatus } from "src/types/electron";
+import type { FileStatus, RepoPayload } from "src/types/electron";
 
-// ─── Constants ───────────────────────────────────────────────────────────────
+import {
+  BG,
+  BORDER,
+  COMMIT_SIDEBAR_WIDTH,
+  FONT,
+  GREEN,
+  MUTED,
+  RED_BG,
+  SUMMARY_MAX,
+  TEAL,
+  TEXT,
+  iconBtn,
+} from "./sidebar/constants";
+import { FileSection } from "./sidebar/file-section";
 
-export const COMMIT_SIDEBAR_WIDTH = 380;
-const SUMMARY_MAX = 72;
+export { COMMIT_SIDEBAR_WIDTH };
 
-const BG = "#272a31";
-const BG_DARK = "#14171c";
-const TEXT = "#ffffff";
-const MUTED = "#8a94a6";
-const GREEN = "#2ea44f";
-const ORANGE = "#d97706";
-const TEAL = "#005f73";
-const RED_BG = "#4a2f33";
-const BORDER = "rgba(255,255,255,0.08)";
-const FONT = '"Inter Variable", Inter, sans-serif';
-
-const STATUS_ICON: Record<string, { icon: IconifyName; color: string }> = {
-  M: { icon: "mdi:pencil", color: "#de9b43" },
-  A: { icon: "ic:baseline-add", color: "#5cb85c" },
-  D: { icon: "mdi:minus-circle-outline", color: "#ef4444" },
-  R: { icon: "mdi:arrow-right-circle-outline", color: "#a78bfa" },
-  "?": { icon: "mdi:help-circle-outline", color: MUTED },
-};
-
-const iconBtn = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  bgcolor: "transparent",
-  border: "none",
-  cursor: "pointer",
-  outline: "none",
-  borderRadius: "3px",
-  p: "3px",
-  color: MUTED,
-  "&:hover": { bgcolor: "rgba(255,255,255,0.07)", color: TEXT },
-} as const;
-
-const scrollHide = {
-  overflowY: "auto",
-  overflowX: "hidden",
-  scrollbarWidth: "none",
-  "&::-webkit-scrollbar": { width: 0 },
-} as const;
-
-// ─── Tree types ───────────────────────────────────────────────────────────────
-
-interface TreeNode {
-  name: string;
-  fullPath: string;
-  isDir: boolean;
-  children: TreeNode[];
-  file?: FileStatus;
-}
-
-function buildTree(files: FileStatus[]): TreeNode[] {
-  const root: TreeNode[] = [];
-  for (const file of files) {
-    const parts = file.path.replace(/\\/g, "/").split("/");
-    let nodes = root;
-    for (let i = 0; i < parts.length; i++) {
-      const part = parts[i];
-      const isLast = i === parts.length - 1;
-      const fullPath = parts.slice(0, i + 1).join("/");
-      if (isLast) {
-        nodes.push({
-          name: part,
-          fullPath: file.path,
-          isDir: false,
-          children: [],
-          file,
-        });
-      } else {
-        let dir = nodes.find((n) => n.isDir && n.name === part);
-        if (!dir) {
-          dir = { name: part, fullPath, isDir: true, children: [] };
-          nodes.push(dir);
-        }
-        nodes = dir.children;
-      }
-    }
-  }
-  return root;
-}
-
-// ─── FileItem (path view) ─────────────────────────────────────────────────────
-
-function FileItem({
-  file,
-  staged,
-  onClick,
-}: {
-  file: FileStatus;
-  staged?: boolean;
-  onClick: () => void;
-}) {
-  const info = STATUS_ICON[file.status] ?? STATUS_ICON["?"];
-  const normalized = file.path.replace(/\\/g, "/");
-  const slash = normalized.lastIndexOf("/");
-  const dir = slash >= 0 ? normalized.slice(0, slash + 1) : "";
-  const name = slash >= 0 ? normalized.slice(slash + 1) : normalized;
-
-  return (
-    <Box
-      component="button"
-      onClick={onClick}
-      title={staged ? `Unstage: ${file.path}` : `Stage: ${file.path}`}
-      sx={{
-        display: "flex",
-        alignItems: "center",
-        gap: 0.75,
-        width: "100%",
-        px: 1.5,
-        py: 0.75,
-        bgcolor: "transparent",
-        border: "none",
-        cursor: "pointer",
-        textAlign: "left",
-        "&:hover": { bgcolor: "#2b3446" },
-        outline: "none",
-        overflow: "hidden",
-        minWidth: 0,
-      }}
-    >
-      <Iconify
-        icon={info.icon}
-        width={14}
-        sx={{ color: info.color, flexShrink: 0 }}
-      />
-      <Typography noWrap sx={{ fontSize: 13, lineHeight: 1.5, minWidth: 0 }}>
-        <span style={{ color: "#777d88" }}>{dir}</span>
-        <span style={{ color: "rgba(255,255,255,0.7)", fontWeight: 500 }}>
-          {name}
-        </span>
-      </Typography>
-    </Box>
-  );
-}
-
-// ─── TreeNodeView (tree view) ─────────────────────────────────────────────────
-
-function TreeNodeView({
-  node,
-  depth,
-  staged,
-  collapsedDirs,
-  onToggleDir,
-  onFileClick,
-}: {
-  node: TreeNode;
-  depth: number;
-  staged?: boolean;
-  collapsedDirs: Set<string>;
-  onToggleDir: (p: string) => void;
-  onFileClick: (p: string) => void;
-}) {
-  if (!node.isDir && node.file) {
-    const info = STATUS_ICON[node.file.status] ?? STATUS_ICON["?"];
-    return (
-      <Box
-        component="button"
-        onClick={() => onFileClick(node.fullPath)}
-        title={staged ? `Unstage: ${node.fullPath}` : `Stage: ${node.fullPath}`}
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          gap: 0.75,
-          width: "100%",
-          pl: `${12 + depth * 14}px`,
-          pr: 1.5,
-          py: 0.6,
-          bgcolor: "transparent",
-          border: "none",
-          cursor: "pointer",
-          textAlign: "left",
-          "&:hover": { bgcolor: "#2b3446" },
-          outline: "none",
-          overflow: "hidden",
-          minWidth: 0,
-        }}
-      >
-        <Iconify
-          icon={info.icon}
-          width={13}
-          sx={{ color: info.color, flexShrink: 0 }}
-        />
-        <Typography
-          noWrap
-          sx={{
-            fontSize: 13,
-            color: "rgba(255,255,255,0.7)",
-            fontWeight: 500,
-            minWidth: 0,
-          }}
-        >
-          {node.name}
-        </Typography>
-      </Box>
-    );
-  }
-
-  const isExpanded = !collapsedDirs.has(node.fullPath);
-  return (
-    <Box>
-      <Box
-        onClick={() => onToggleDir(node.fullPath)}
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          gap: 0.5,
-          pl: `${12 + depth * 14}px`,
-          pr: 1.5,
-          py: 0.5,
-          cursor: "pointer",
-          "&:hover": { bgcolor: "#2b3446" },
-        }}
-      >
-        <Iconify
-          icon={isExpanded ? "mdi:chevron-down" : "mdi:chevron-right"}
-          width={12}
-          sx={{ color: MUTED, flexShrink: 0 }}
-        />
-        <Iconify
-          icon="mdi:folder-outline"
-          width={14}
-          sx={{ color: "#8ab4f8", flexShrink: 0 }}
-        />
-        <Typography
-          noWrap
-          sx={{ fontSize: 13, color: "rgba(255,255,255,0.55)" }}
-        >
-          {node.name}
-        </Typography>
-      </Box>
-      {isExpanded &&
-        node.children.map((child) => (
-          <TreeNodeView
-            key={child.fullPath}
-            node={child}
-            depth={depth + 1}
-            staged={staged}
-            collapsedDirs={collapsedDirs}
-            onToggleDir={onToggleDir}
-            onFileClick={onFileClick}
-          />
-        ))}
-    </Box>
-  );
-}
-
-// ─── FileSection ──────────────────────────────────────────────────────────────
-
-function FileSection({
-  title,
-  files,
-  staged,
-  open,
-  onToggle,
-  onFileClick,
-  onActionAll,
-  actionBtn,
-  viewMode,
-  sortOrder,
-  collapsedDirs,
-  onToggleDir,
-}: {
-  title: string;
-  files: FileStatus[];
-  staged?: boolean;
-  open: boolean;
-  onToggle: () => void;
-  onFileClick: (p: string) => void;
-  onActionAll: () => void;
-  actionBtn: React.ReactNode;
-  viewMode: "path" | "tree";
-  sortOrder: "asc" | "desc";
-  collapsedDirs: Set<string>;
-  onToggleDir: (p: string) => void;
-}) {
-  const sorted = useMemo(
-    () =>
-      [...files].sort((a, b) =>
-        sortOrder === "asc"
-          ? a.path.localeCompare(b.path)
-          : b.path.localeCompare(a.path),
-      ),
-    [files, sortOrder],
-  );
-  const tree = useMemo(
-    () => (viewMode === "tree" ? buildTree(sorted) : []),
-    [sorted, viewMode],
-  );
-
-  return (
-    <Box
-      sx={{
-        display: "flex",
-        flexDirection: "column",
-        flex: open ? 1 : "none",
-        minHeight: 0,
-        overflow: "hidden",
-      }}
-    >
-      <Box
-        onClick={onToggle}
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          gap: 0.5,
-          px: 0.75,
-          py: 0.6,
-          cursor: "pointer",
-          flexShrink: 0,
-          ...(open && { borderBottom: `1px solid ${BORDER}` }),
-          "&:hover": {
-            bgcolor: "rgba(255,255,255,0.03)",
-            "& p": { color: "#e8e8e9" },
-          },
-        }}
-      >
-        <Iconify
-          icon={open ? "mdi:chevron-down" : "mdi:chevron-right"}
-          width={16}
-          sx={{ color: MUTED, flexShrink: 0 }}
-        />
-        <Typography
-          sx={{
-            fontSize: 13,
-            color: "#b8b9bb",
-            fontWeight: 500,
-            flex: 1,
-            transition: "color 0.15s",
-          }}
-        >
-          {title} ({files.length})
-        </Typography>
-        {files.length > 0 && (
-          <Box
-            component="button"
-            onClick={(e: React.MouseEvent) => {
-              e.stopPropagation();
-              onActionAll();
-            }}
-            sx={{
-              bgcolor: "transparent",
-              border: "none",
-              p: 0,
-              cursor: "pointer",
-              outline: "none",
-              flexShrink: 0,
-            }}
-          >
-            {actionBtn}
-          </Box>
-        )}
-      </Box>
-
-      {open && (
-        <Box sx={{ flex: 1, minHeight: 0, ...scrollHide }}>
-          {viewMode === "path"
-            ? sorted.map((f) => (
-                <FileItem
-                  key={f.path}
-                  file={f}
-                  staged={staged}
-                  onClick={() => onFileClick(f.path)}
-                />
-              ))
-            : tree.map((n) => (
-                <TreeNodeView
-                  key={n.fullPath}
-                  node={n}
-                  depth={0}
-                  staged={staged}
-                  collapsedDirs={collapsedDirs}
-                  onToggleDir={onToggleDir}
-                  onFileClick={onFileClick}
-                />
-              ))}
-        </Box>
-      )}
-    </Box>
-  );
-}
-
-// ─── Action button templates ──────────────────────────────────────────────────
+// ----------------------------------------------------------------------
 
 const StageAllBtn = (
   <Box
@@ -411,7 +46,7 @@ const StageAllBtn = (
       py: "2px",
       bgcolor: "#314739",
       "&:hover": { bgcolor: "#477f4b" },
-      pointerEvents: "none", // handled by parent button wrapper
+      pointerEvents: "none",
     }}
   >
     Stage All Changes
@@ -437,12 +72,12 @@ const UnstageAllBtn = (
   </Box>
 );
 
-// ─── CommitSidebar ────────────────────────────────────────────────────────────
+// ----------------------------------------------------------------------
 
-interface Props {
+type Props = {
   payload: RepoPayload;
   onRefresh: (newPayload: RepoPayload) => void;
-}
+};
 
 export function CommitSidebar({ payload, onRefresh }: Props) {
   const [staged, setStaged] = useState<FileStatus[]>([]);
@@ -472,26 +107,35 @@ export function CommitSidebar({ payload, onRefresh }: Props) {
     loadStatus();
   }, [loadStatus]);
 
-  const handleStageAll = async () => {
+  const handleStageAll = useCallback(async () => {
     await window.api.gitStageAll(payload.repoPath);
     await loadStatus();
-  };
-  const handleStageFile = async (p: string) => {
-    await window.api.gitStageFile(payload.repoPath, p);
-    await loadStatus();
-  };
-  const handleUnstageFile = async (p: string) => {
-    await window.api.gitUnstageFile(payload.repoPath, p);
-    await loadStatus();
-  };
-  const handleUnstageAll = async () => {
+  }, [payload.repoPath, loadStatus]);
+
+  const handleStageFile = useCallback(
+    async (p: string) => {
+      await window.api.gitStageFile(payload.repoPath, p);
+      await loadStatus();
+    },
+    [payload.repoPath, loadStatus],
+  );
+
+  const handleUnstageFile = useCallback(
+    async (p: string) => {
+      await window.api.gitUnstageFile(payload.repoPath, p);
+      await loadStatus();
+    },
+    [payload.repoPath, loadStatus],
+  );
+
+  const handleUnstageAll = useCallback(async () => {
     await Promise.all(
       staged.map((f) => window.api.gitUnstageFile(payload.repoPath, f.path)),
     );
     await loadStatus();
-  };
+  }, [staged, payload.repoPath, loadStatus]);
 
-  const handleDiscardConfirm = async () => {
+  const handleDiscardConfirm = useCallback(async () => {
     setDiscardOpen(false);
     const result = await window.api.gitDiscardAll(payload.repoPath);
     if (result.error) toast.error(result.error);
@@ -499,9 +143,9 @@ export function CommitSidebar({ payload, onRefresh }: Props) {
       await loadStatus();
       toast.success("Alterações descartadas.");
     }
-  };
+  }, [payload.repoPath, loadStatus]);
 
-  const handleCommit = async () => {
+  const handleCommit = useCallback(async () => {
     if (!summary.trim() || staged.length === 0 || committing) return;
     setCommitting(true);
     try {
@@ -529,16 +173,27 @@ export function CommitSidebar({ payload, onRefresh }: Props) {
               toast.success("Push realizado com sucesso.");
               if (pushResult.payload) onRefresh(pushResult.payload);
             }
-          } catch (pushErr: any) {
+          } catch (pushErr: unknown) {
             toast.dismiss("push-loading");
-            toast.error(`Erro no push: ${pushErr.message || pushErr}`);
+            const msg =
+              pushErr instanceof Error ? pushErr.message : String(pushErr);
+            toast.error(`Erro no push: ${msg}`);
           }
         }
       }
     } finally {
       setCommitting(false);
     }
-  };
+  }, [
+    summary,
+    staged,
+    committing,
+    payload.repoPath,
+    description,
+    loadStatus,
+    onRefresh,
+    pushAfterCommit,
+  ]);
 
   const toggleDir = useCallback((path: string) => {
     setCollapsedDirs((prev) => {
@@ -571,7 +226,7 @@ export function CommitSidebar({ payload, onRefresh }: Props) {
           "& *": { fontFamily: `${FONT} !important` },
         }}
       >
-        {/* ── TOP SECTION (scrollable, absorve o espaço restante) ── */}
+        {/* ── TOP SECTION ── */}
         <Box
           sx={{
             flex: 1,
@@ -584,7 +239,7 @@ export function CommitSidebar({ payload, onRefresh }: Props) {
             "&::-webkit-scrollbar": { width: 0 },
           }}
         >
-          {/* ── Header ── */}
+          {/* Header */}
           <Box
             sx={{
               display: "flex",
@@ -663,7 +318,7 @@ export function CommitSidebar({ payload, onRefresh }: Props) {
             </Box>
           </Box>
 
-          {/* ── View Toggle ── */}
+          {/* View Toggle */}
           <Box
             sx={{
               display: "flex",
@@ -673,7 +328,6 @@ export function CommitSidebar({ payload, onRefresh }: Props) {
               flexShrink: 0,
             }}
           >
-            {/* Sort */}
             <Box
               component="button"
               onClick={() =>
@@ -696,7 +350,6 @@ export function CommitSidebar({ payload, onRefresh }: Props) {
               />
             </Box>
 
-            {/* Path / Tree — centered */}
             <Box
               sx={{
                 flex: 1,
@@ -730,11 +383,10 @@ export function CommitSidebar({ payload, onRefresh }: Props) {
               ))}
             </Box>
 
-            {/* Spacer to balance sort button */}
             <Box sx={{ width: 22, flexShrink: 0 }} />
           </Box>
 
-          {/* ── File List ── */}
+          {/* File List */}
           <Box
             sx={{
               flex: 1,
@@ -772,9 +424,8 @@ export function CommitSidebar({ payload, onRefresh }: Props) {
             />
           </Box>
         </Box>
-        {/* fim TOP SECTION */}
 
-        {/* ── Commit Panel ── filho direto do sidebar, nunca comprimido ── */}
+        {/* ── Commit Panel ── */}
         <Box
           sx={{ flexShrink: 0, bgcolor: BG, borderTop: `1px solid ${BORDER}` }}
         >
@@ -851,7 +502,7 @@ export function CommitSidebar({ payload, onRefresh }: Props) {
                 component="input"
                 placeholder="Commit summary"
                 value={summary}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                onChange={(e: ChangeEvent<HTMLInputElement>) =>
                   setSummary(e.target.value.slice(0, SUMMARY_MAX))
                 }
                 sx={{
@@ -877,7 +528,7 @@ export function CommitSidebar({ payload, onRefresh }: Props) {
               placeholder="Description"
               value={description}
               rows={5}
-              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
+              onChange={(e: ChangeEvent<HTMLTextAreaElement>) =>
                 setDescription(e.target.value)
               }
               sx={{
@@ -969,7 +620,7 @@ export function CommitSidebar({ payload, onRefresh }: Props) {
         </Box>
       </Box>
 
-      {/* ── Discard confirmation dialog ── */}
+      {/* ── Discard dialog ── */}
       <Dialog
         open={discardOpen}
         onClose={() => setDiscardOpen(false)}

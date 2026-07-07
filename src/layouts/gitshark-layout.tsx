@@ -62,7 +62,7 @@ export function GitSharkLayout() {
             const loaded: Tab[] = [];
             const origIdxs: number[] = [];
             results.forEach((r, i) => {
-              if (r.status === 'fulfilled' && r.value && !r.value.error) {
+              if (r.status === 'fulfilled' && r.value && !('error' in r.value)) {
                 loaded.push({ payload: r.value, scrollTop: 0, selectedIdx: -1 });
                 origIdxs.push(i);
               }
@@ -313,6 +313,7 @@ export function GitSharkLayout() {
               creatingBranch={creatingBranch}
               onCancelCreateBranch={() => setCreatingBranch(false)}
               onSubmitBranch={handleCreateBranch}
+              onRefresh={handleRefresh}
             />
           ) : (
             <WelcomeScreen onOpenRepo={openRepo} />

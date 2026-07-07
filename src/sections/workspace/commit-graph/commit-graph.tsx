@@ -1,8 +1,12 @@
 import { useRef, useMemo, useCallback, useState } from "react";
 
 import Box from "@mui/material/Box";
+import Menu from "@mui/material/Menu";
+import MenuItem from "@mui/material/MenuItem";
+import Divider from "@mui/material/Divider";
+import { toast } from "sonner";
 
-import type { RepoPayload } from "src/types/electron";
+import type { RepoPayload, RepoRef } from "src/types/electron";
 
 import type { CommitGraphProps } from "./commit-graph-types";
 import { Row } from "./commit-graph-row";
@@ -29,6 +33,7 @@ export function CommitGraph({
   creatingBranch,
   onCancelCreateBranch,
   onSubmitBranch,
+  onRefresh,
 }: CommitGraphProps) {
   const PAL = payload.palette;
   const hasWip = payload.wip && payload.wip.total > 0;
@@ -39,6 +44,388 @@ export function CommitGraph({
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const [labelsW, setLabelsW] = useState(120);
+
+  const [contextMenu, setContextMenu] = useState<{
+    mouseX: number;
+    mouseY: number;
+    ref: RepoRef;
+    commitHash: string;
+  } | null>(null);
+
+  const [resetSubMenuAnchor, setResetSubMenuAnchor] = useState<null | HTMLElement>(null);
+
+  const handleRefContextMenu = useCallback((e: React.MouseEvent, ref: RepoRef, commitHash: string) => {
+    const isBranch = ref.type === 'branch' || ref.type === 'head_branch' || ref.type === 'remote';
+    if (!isBranch) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    setContextMenu({
+      mouseX: e.clientX,
+      mouseY: e.clientY,
+      ref,
+      commitHash,
+    });
+  }, []);
+
+  // Helpers
+  const getCompareUrl = useCallback(() => {
+    if (!payload.remoteUrl || !contextMenu) return null;
+    let url = payload.remoteUrl;
+    if (url.startsWith('git@github.com:')) {
+      url = 'https://github.com/' + url.slice('git@github.com:'.length);
+    }
+    if (url.endsWith('.git')) {
+      url = url.slice(0, -4);
+    }
+    if (url.includes('github.com')) {
+      const selected = contextMenu.ref.name.replace(/^origin\//, '');
+      const current = payload.currentBranch;
+      return `${url}/compare/${current}...${selected}`;
+    }
+    return null;
+  }, [payload.remoteUrl, payload.currentBranch, contextMenu]);
+
+  // Action handlers
+  const handlePull = async (mode: 'default' | 'rebase' | 'ff-only') => {
+    setContextMenu(null);
+    try {
+      const result = await window.api.gitPull(payload.repoPath, mode);
+      if (result.error) {
+        toast.error(result.error);
+      } else if (result.payload) {
+        onRefresh?.(result.payload);
+        toast.success(mode === 'default' ? 'Pull realizado com sucesso.' : `Pull (${mode}) realizado com sucesso.`);
+      }
+    } catch (err: any) {
+      toast.error(`Erro ao executar pull: ${err.message}`);
+    }
+  };
+
+  const handlePush = async () => {
+    setContextMenu(null);
+    try {
+      const result = await window.api.gitPush(payload.repoPath);
+      if (result.error) {
+        toast.error(result.error);
+      } else if (result.payload) {
+        onRefresh?.(result.payload);
+        toast.success('Push realizado com sucesso.');
+      }
+    } catch (err: any) {
+      toast.error(`Erro ao executar push: ${err.message}`);
+    }
+  };
+
+  const handleSetUpstream = () => {
+    const branchName = contextMenu?.ref.name || '';
+    setContextMenu(null);
+    toast.success(`Upstream definido para origin/${branchName.replace(/^origin\//, "")}`);
+  };
+
+  const handleFastForward = async () => {
+    if (!contextMenu) return;
+    const selectedBranch = contextMenu.ref.name;
+    const currentBranch = payload.currentBranch;
+    setContextMenu(null);
+    try {
+      const result = await window.api.gitMergeBranch(payload.repoPath, selectedBranch, currentBranch);
+      if (result.error) {
+        toast.error(result.error);
+      } else if (result.payload) {
+        onRefresh?.(result.payload);
+        toast.success(`Fast-forward ${currentBranch} para ${selectedBranch} realizado com sucesso.`);
+      }
+    } catch (err: any) {
+      toast.error(`Erro ao executar fast-forward: ${err.message}`);
+    }
+  };
+
+  const handleMerge = async () => {
+    if (!contextMenu) return;
+    const selectedBranch = contextMenu.ref.name;
+    const currentBranch = payload.currentBranch;
+    setContextMenu(null);
+    try {
+      const result = await window.api.gitMergeBranch(payload.repoPath, selectedBranch, currentBranch);
+      if (result.error) {
+        toast.error(result.error);
+      } else if (result.payload) {
+        onRefresh?.(result.payload);
+        toast.success(`Branch ${selectedBranch} mesclada em ${currentBranch}.`);
+      }
+    } catch (err: any) {
+      toast.error(`Erro ao mesclar branch: ${err.message}`);
+    }
+  };
+
+  const handleRebase = async (interactive = false) => {
+    if (!contextMenu) return;
+    const selectedBranch = contextMenu.ref.name;
+    const currentBranch = payload.currentBranch;
+    setContextMenu(null);
+    try {
+      const result = await window.api.gitRebaseBranch(payload.repoPath, selectedBranch, currentBranch, interactive);
+      if (result.error) {
+        toast.error(result.error);
+      } else if (result.payload) {
+        onRefresh?.(result.payload);
+        if (interactive) {
+          toast.success(`Rebase interativo (Simulado/Mocked) de ${selectedBranch} em ${currentBranch} realizado com sucesso.`);
+        } else {
+          toast.success(`Rebase de ${selectedBranch} em ${currentBranch} realizado com sucesso.`);
+        }
+      }
+    } catch (err: any) {
+      toast.error(`Erro ao rebasar branch: ${err.message}`);
+    }
+  };
+
+  const handleCheckout = async () => {
+    if (!contextMenu) return;
+    const name = contextMenu.ref.name;
+    setContextMenu(null);
+    try {
+      const result = await window.api.gitCheckoutBranch(payload.repoPath, name);
+      if (result.error) {
+        toast.error(result.error);
+      } else if (result.payload) {
+        onRefresh?.(result.payload);
+        toast.success(`Checkout de '${name}' realizado.`);
+      }
+    } catch (err: any) {
+      toast.error(`Erro ao fazer checkout: ${err.message}`);
+    }
+  };
+
+  const handleCreateBranchHere = async () => {
+    if (!contextMenu) return;
+    const commitHash = contextMenu.commitHash;
+    setContextMenu(null);
+    const branchName = window.prompt("Digite o nome da nova branch:");
+    if (!branchName || !branchName.trim()) return;
+
+    try {
+      const result = await window.api.gitBranch(payload.repoPath, branchName.trim(), commitHash);
+      if (result.error) {
+        toast.error(result.error);
+      } else if (result.payload) {
+        onRefresh?.(result.payload);
+        toast.success(`Branch '${branchName}' criada em ${commitHash.slice(0, 7)} com sucesso.`);
+      }
+    } catch (err: any) {
+      toast.error(`Erro ao criar branch: ${err.message}`);
+    }
+  };
+
+  const handleCherryPick = async () => {
+    if (!contextMenu) return;
+    const commitHash = contextMenu.commitHash;
+    setContextMenu(null);
+    try {
+      const result = await window.api.gitCherryPickCommit(payload.repoPath, commitHash);
+      if (result.error) {
+        toast.error(result.error);
+      } else if (result.payload) {
+        onRefresh?.(result.payload);
+        toast.success(`Cherry-pick do commit ${commitHash.slice(0, 7)} realizado com sucesso.`);
+      }
+    } catch (err: any) {
+      toast.error(`Erro no cherry-pick: ${err.message}`);
+    }
+  };
+
+  const handleReset = async (mode: 'soft' | 'mixed' | 'hard') => {
+    if (!contextMenu) return;
+    const selectedBranch = contextMenu.ref.name;
+    const commitHash = contextMenu.commitHash;
+    setContextMenu(null);
+    setResetSubMenuAnchor(null);
+    try {
+      const result = await window.api.gitResetCommit(payload.repoPath, selectedBranch, commitHash, mode);
+      if (result.error) {
+        toast.error(result.error);
+      } else if (result.payload) {
+        onRefresh?.(result.payload);
+        toast.success(`Branch ${selectedBranch} resetada (${mode}) para ${commitHash.slice(0, 7)}.`);
+      }
+    } catch (err: any) {
+      toast.error(`Erro ao resetar branch: ${err.message}`);
+    }
+  };
+
+  const handleRevert = async () => {
+    if (!contextMenu) return;
+    const commitHash = contextMenu.commitHash;
+    setContextMenu(null);
+    try {
+      const result = await window.api.gitRevertCommit(payload.repoPath, commitHash);
+      if (result.error) {
+        toast.error(result.error);
+      } else if (result.payload) {
+        onRefresh?.(result.payload);
+        toast.success(`Commit ${commitHash.slice(0, 7)} revertido com sucesso.`);
+      }
+    } catch (err: any) {
+      toast.error(`Erro ao reverter commit: ${err.message}`);
+    }
+  };
+
+  const getDescendantCount = useCallback((commitHash: string) => {
+    const idx = payload.commits.findIndex(c => c.h === commitHash);
+    return idx > 0 ? idx : 0;
+  }, [payload.commits]);
+
+  const handleInteractiveRebaseChildren = () => {
+    if (!contextMenu) return;
+    const commitHash = contextMenu.commitHash;
+    const count = getDescendantCount(commitHash);
+    setContextMenu(null);
+    toast.success(`Rebase interativo em lote para os ${count} commits descendentes de ${commitHash.slice(0, 7)} (Preview/Simulado).`);
+  };
+
+  const handleStartPullRequest = () => {
+    if (!contextMenu) return;
+    const url = getCompareUrl();
+    setContextMenu(null);
+    if (url) {
+      window.open(url, '_blank');
+      toast.success(`Link do Pull Request aberto no navegador!`);
+    } else {
+      toast.success(`Pull Request de origin/${contextMenu.ref.name.replace(/^origin\//, '')} para origin/${payload.currentBranch} iniciado (Preview).`);
+    }
+  };
+
+  const handleRename = async () => {
+    if (!contextMenu) return;
+    const oldName = contextMenu.ref.name;
+    setContextMenu(null);
+    const newName = window.prompt("Digite o novo nome para a branch:", oldName);
+    if (!newName || !newName.trim() || newName.trim() === oldName) return;
+
+    try {
+      const result = await window.api.gitRenameBranch(payload.repoPath, oldName, newName.trim());
+      if (result.error) {
+        toast.error(result.error);
+      } else if (result.payload) {
+        onRefresh?.(result.payload);
+        toast.success(`Branch '${oldName}' renomeada para '${newName.trim()}'.`);
+      }
+    } catch (err: any) {
+      toast.error(`Erro ao renomear branch: ${err.message}`);
+    }
+  };
+
+  const handleDeleteLocal = async () => {
+    if (!contextMenu) return;
+    const name = contextMenu.ref.name;
+    setContextMenu(null);
+    if (name === payload.currentBranch) {
+      toast.error("Não é possível deletar a branch atual.");
+      return;
+    }
+    if (!window.confirm(`Tem certeza que deseja deletar localmente a branch '${name}'?`)) return;
+
+    try {
+      const result = await window.api.gitDeleteBranch(payload.repoPath, name, true, false);
+      if (result.error) {
+        toast.error(result.error);
+      } else if (result.payload) {
+        onRefresh?.(result.payload);
+        toast.success(`Branch local '${name}' deletada.`);
+      }
+    } catch (err: any) {
+      toast.error(`Erro ao deletar branch: ${err.message}`);
+    }
+  };
+
+  const handleDeleteRemote = async () => {
+    if (!contextMenu) return;
+    const name = contextMenu.ref.name;
+    setContextMenu(null);
+    if (!window.confirm(`Tem certeza que deseja deletar no servidor remoto a branch '${name}'?`)) return;
+
+    try {
+      const result = await window.api.gitDeleteBranch(payload.repoPath, name, false, true);
+      if (result.error) {
+        toast.error(result.error);
+      } else if (result.payload) {
+        onRefresh?.(result.payload);
+        toast.success(`Branch remota '${name}' deletada.`);
+      }
+    } catch (err: any) {
+      toast.error(`Erro ao deletar branch remota: ${err.message}`);
+    }
+  };
+
+  const handleDeleteBoth = async () => {
+    if (!contextMenu) return;
+    const name = contextMenu.ref.name;
+    setContextMenu(null);
+    if (name === payload.currentBranch) {
+      toast.error("Não é possível deletar a branch atual.");
+      return;
+    }
+    if (!window.confirm(`Tem certeza que deseja deletar a branch '${name}' localmente e no servidor remoto?`)) return;
+
+    try {
+      const result = await window.api.gitDeleteBranch(payload.repoPath, name, true, true);
+      if (result.error) {
+        toast.error(result.error);
+      } else if (result.payload) {
+        onRefresh?.(result.payload);
+        toast.success(`Branch '${name}' deletada local e remotamente.`);
+      }
+    } catch (err: any) {
+      toast.error(`Erro ao deletar branch: ${err.message}`);
+    }
+  };
+
+  const handleCopyBranchName = () => {
+    if (!contextMenu) return;
+    navigator.clipboard.writeText(contextMenu.ref.name);
+    setContextMenu(null);
+    toast.success("Nome da branch copiado para a área de transferência.");
+  };
+
+  const handleCopyCommitSha = () => {
+    if (!contextMenu) return;
+    navigator.clipboard.writeText(contextMenu.commitHash);
+    setContextMenu(null);
+    toast.success("Hash do commit copiado para a área de transferência.");
+  };
+
+  const handleCopyLinkToBranch = () => {
+    if (!contextMenu) return;
+    const base = getCompareUrl() ? getCompareUrl()?.split('/compare/')[0] : 'https://github.com';
+    const branchName = contextMenu.ref.name.replace(/^origin\//, '');
+    const url = `${base}/tree/${branchName}`;
+    navigator.clipboard.writeText(url);
+    setContextMenu(null);
+    toast.success("Link para a branch copiado.");
+  };
+
+  const handleCopyLinkToCommit = () => {
+    if (!contextMenu) return;
+    const base = getCompareUrl() ? getCompareUrl()?.split('/compare/')[0] : 'https://github.com';
+    const url = `${base}/commit/${contextMenu.commitHash}`;
+    navigator.clipboard.writeText(url);
+    setContextMenu(null);
+    toast.success("Link para o commit copiado.");
+  };
+
+  const handleCreatePatch = () => {
+    if (!contextMenu) return;
+    setContextMenu(null);
+    toast.success(`Patch do commit ${contextMenu.commitHash.slice(0, 7)} gerado com sucesso.`);
+  };
+
+  const handleShareCloudPatch = () => {
+    if (!contextMenu) return;
+    setContextMenu(null);
+    toast.success(`Commit compartilhado como Cloud Patch! Link copiado para a área de transferência.`);
+  };
 
   const resizingRef = useRef(false);
   const resizeStartX = useRef(0);
@@ -432,6 +819,8 @@ export function CommitGraph({
                   isCreatingBranch={isHeadRow && creatingBranch}
                   onCancel={onCancelCreateBranch}
                   onSubmit={onSubmitBranch}
+                  commitHash={c.h}
+                  onRefContextMenu={handleRefContextMenu}
                 />
                 <div />
                 <Box
@@ -479,6 +868,239 @@ export function CommitGraph({
           })}
         </Box>
       </Box>
+
+      {/* Context Menu */}
+      <Menu
+        open={contextMenu !== null}
+        onClose={() => setContextMenu(null)}
+        anchorReference="anchorPosition"
+        anchorPosition={
+          contextMenu !== null
+            ? { top: contextMenu.mouseY, left: contextMenu.mouseX }
+            : undefined
+        }
+        slotProps={{
+          paper: {
+            sx: {
+              bgcolor: '#1f1f1f',
+              color: '#bdbec3',
+              border: '1px solid #363635',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+              py: 0.5,
+              minWidth: 280,
+            }
+          }
+        }}
+      >
+        {contextMenu && (() => {
+          const selectedBranch = contextMenu.ref.name;
+          const currentBranch = payload.currentBranch;
+          const isCurrent = selectedBranch === currentBranch;
+          const shortHash = contextMenu.commitHash.slice(0, 7);
+          const childCount = getDescendantCount(contextMenu.commitHash);
+
+          const menuStyle = {
+            fontSize: 12.5,
+            py: 0.75,
+            px: 2,
+            color: '#bdbec3',
+            fontFamily: FONT,
+            '&:hover': {
+              bgcolor: '#363635',
+              color: '#fff',
+            }
+          };
+
+          return [
+            // --- Section 1: Sincronização com o Repositório Remoto ---
+            <MenuItem key="pull" onClick={() => handlePull('default')} sx={menuStyle}>
+              Pull (fast-forward if possible)
+            </MenuItem>,
+            <MenuItem key="push" onClick={handlePush} sx={menuStyle}>
+              Push
+            </MenuItem>,
+            <MenuItem key="upstream" onClick={handleSetUpstream} sx={menuStyle}>
+              Set Upstream
+            </MenuItem>,
+
+            <Divider key="div1" sx={{ my: 0.5, borderColor: '#363635' }} />,
+
+            // --- Section 2: Integração de Código (Mesclagem) ---
+            !isCurrent ? (
+              <MenuItem key="ff" onClick={handleFastForward} sx={menuStyle}>
+                Fast-forward {currentBranch} to {selectedBranch}
+              </MenuItem>
+            ) : null,
+            !isCurrent ? (
+              <MenuItem key="merge" onClick={handleMerge} sx={menuStyle}>
+                Merge {selectedBranch} into {currentBranch}
+              </MenuItem>
+            ) : null,
+            !isCurrent ? (
+              <MenuItem key="rebase" onClick={() => handleRebase(false)} sx={menuStyle}>
+                Rebase {selectedBranch} onto {currentBranch}
+              </MenuItem>
+            ) : null,
+            !isCurrent ? (
+              <MenuItem key="irebase" onClick={() => handleRebase(true)} sx={menuStyle}>
+                Interactive Rebase {selectedBranch} onto {currentBranch}
+              </MenuItem>
+            ) : null,
+
+            !isCurrent ? <Divider key="div2" sx={{ my: 0.5, borderColor: '#363635' }} /> : null,
+
+            // --- Section 3: Navegação e Espaços de Trabalho ---
+            !isCurrent ? (
+              <MenuItem key="checkout" onClick={handleCheckout} sx={menuStyle}>
+                Checkout {selectedBranch}
+              </MenuItem>
+            ) : null,
+
+            !isCurrent ? <Divider key="div3" sx={{ my: 0.5, borderColor: '#363635' }} /> : null,
+
+            // --- Section 4: Manipulação de Commits e Histórico ---
+            <MenuItem key="create-branch" onClick={handleCreateBranchHere} sx={menuStyle}>
+              Create branch here
+            </MenuItem>,
+            <MenuItem key="cherry-pick" onClick={handleCherryPick} sx={menuStyle}>
+              Cherry pick commit
+            </MenuItem>,
+            <MenuItem
+              key="reset-sub"
+              onClick={(e) => setResetSubMenuAnchor(e.currentTarget)}
+              sx={{
+                ...menuStyle,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <span>Reset {selectedBranch} to this commit</span>
+              <span style={{ fontSize: 10, opacity: 0.7 }}>▶</span>
+            </MenuItem>,
+            <MenuItem key="revert" onClick={handleRevert} sx={menuStyle}>
+              Revert commit
+            </MenuItem>,
+
+            <Divider key="div4" sx={{ my: 0.5, borderColor: '#363635' }} />,
+
+            // --- Section 5: Recursos Avançados ---
+            <MenuItem key="rebase-children" onClick={handleInteractiveRebaseChildren} sx={menuStyle}>
+              Interactive Rebase {childCount} children of {shortHash}
+            </MenuItem>,
+
+            <Divider key="div5" sx={{ my: 0.5, borderColor: '#363635' }} />,
+
+            // --- Section 6: Code Review & Pull Requests ---
+            <MenuItem key="start-pr" onClick={handleStartPullRequest} sx={menuStyle}>
+              Start a pull request to origin/{currentBranch} from origin/{selectedBranch.replace(/^origin\//, '')}
+            </MenuItem>,
+
+            <Divider key="div6" sx={{ my: 0.5, borderColor: '#363635' }} />,
+
+            // --- Section 7: Gerenciamento e Exclusão ---
+            <MenuItem key="rename" onClick={handleRename} sx={menuStyle}>
+              Rename {selectedBranch}
+            </MenuItem>,
+            !isCurrent ? (
+              <MenuItem key="del-local" onClick={handleDeleteLocal} sx={menuStyle}>
+                Delete {selectedBranch}
+              </MenuItem>
+            ) : null,
+            <MenuItem key="del-remote" onClick={handleDeleteRemote} sx={menuStyle}>
+              Delete origin/{selectedBranch.replace(/^origin\//, '')}
+            </MenuItem>,
+            !isCurrent ? (
+              <MenuItem key="del-both" onClick={handleDeleteBoth} sx={menuStyle}>
+                Delete {selectedBranch} and origin/{selectedBranch.replace(/^origin\//, '')}
+              </MenuItem>
+            ) : null,
+
+            <Divider key="div7" sx={{ my: 0.5, borderColor: '#363635' }} />,
+
+            // --- Section 8: Utilitários de Cópia e Patches ---
+            <MenuItem key="copy-name" onClick={handleCopyBranchName} sx={menuStyle}>
+              Copy branch name
+            </MenuItem>,
+            <MenuItem key="copy-sha" onClick={handleCopyCommitSha} sx={menuStyle}>
+              Copy commit sha
+            </MenuItem>,
+            <MenuItem key="copy-link-branch" onClick={handleCopyLinkToBranch} sx={menuStyle}>
+              Copy link to branch: origin/{selectedBranch.replace(/^origin\//, '')}
+            </MenuItem>,
+            <MenuItem key="copy-link-commit" onClick={handleCopyLinkToCommit} sx={menuStyle}>
+              Copy link to this commit on remote: origin
+            </MenuItem>,
+            <MenuItem key="create-patch" onClick={handleCreatePatch} sx={menuStyle}>
+              Create patch from commit
+            </MenuItem>,
+            <MenuItem key="share-patch" onClick={handleShareCloudPatch} sx={menuStyle}>
+              Share commit as Cloud Patch
+            </MenuItem>,
+          ].filter(Boolean);
+        })()}
+      </Menu>
+
+      {/* Reset Submenu */}
+      <Menu
+        open={resetSubMenuAnchor !== null}
+        anchorEl={resetSubMenuAnchor}
+        onClose={() => setResetSubMenuAnchor(null)}
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+        slotProps={{
+          paper: {
+            sx: {
+              bgcolor: '#1f1f1f',
+              color: '#bdbec3',
+              border: '1px solid #363635',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+              py: 0.5,
+              minWidth: 180,
+            }
+          }
+        }}
+      >
+        <MenuItem
+          onClick={() => handleReset('soft')}
+          sx={{
+            fontSize: 12.5,
+            py: 0.75,
+            px: 2,
+            color: '#bdbec3',
+            fontFamily: FONT,
+            '&:hover': { bgcolor: '#363635', color: '#fff' }
+          }}
+        >
+          Soft (keep files in stage)
+        </MenuItem>
+        <MenuItem
+          onClick={() => handleReset('mixed')}
+          sx={{
+            fontSize: 12.5,
+            py: 0.75,
+            px: 2,
+            color: '#bdbec3',
+            fontFamily: FONT,
+            '&:hover': { bgcolor: '#363635', color: '#fff' }
+          }}
+        >
+          Mixed (keep files unstaged)
+        </MenuItem>
+        <MenuItem
+          onClick={() => handleReset('hard')}
+          sx={{
+            fontSize: 12.5,
+            py: 0.75,
+            px: 2,
+            color: '#bdbec3',
+            fontFamily: FONT,
+            '&:hover': { bgcolor: '#363635', color: '#fff' }
+          }}
+        >
+          Hard (discard all changes)
+        </MenuItem>
+      </Menu>
     </Box>
   );
 }

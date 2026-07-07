@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import Box from "@mui/material/Box";
 
 import type { GroupedRef } from "./commit-graph-types";
+import type { RepoRef } from "src/types/electron";
 import { chipBg } from "./utils";
 
 // ----------------------------------------------------------------------
@@ -30,6 +31,8 @@ export function RefLabels({
   isCreatingBranch,
   onCancel,
   onSubmit,
+  commitHash,
+  onRefContextMenu,
 }: {
   groups: GroupedRef[];
   laneColor: string;
@@ -37,6 +40,8 @@ export function RefLabels({
   isCreatingBranch?: boolean;
   onCancel?: () => void;
   onSubmit?: (name: string) => void;
+  commitHash: string;
+  onRefContextMenu?: (e: React.MouseEvent, ref: RepoRef, commitHash: string) => void;
 }) {
   if (isCreatingBranch) {
     return (
@@ -77,7 +82,12 @@ export function RefLabels({
           : undefined,
       }}
     >
-      <RefChip group={primary} laneColor={laneColor} colWidth={colWidth} />
+      <RefChip
+        group={primary}
+        laneColor={laneColor}
+        colWidth={colWidth}
+        onContextMenu={(e) => onRefContextMenu?.(e, primary.ref, commitHash)}
+      />
 
       {hasOverflow && (
         <Box
@@ -118,9 +128,19 @@ export function RefLabels({
             overflow: "hidden",
           }}
         >
-          <RefExpandedRow group={primary} laneColor={laneColor} isPrimary />
+          <RefExpandedRow
+            group={primary}
+            laneColor={laneColor}
+            isPrimary
+            onContextMenu={(e) => onRefContextMenu?.(e, primary.ref, commitHash)}
+          />
           {overflow.map((g, i) => (
-            <RefExpandedRow key={i} group={g} laneColor={laneColor} />
+            <RefExpandedRow
+              key={i}
+              group={g}
+              laneColor={laneColor}
+              onContextMenu={(e) => onRefContextMenu?.(e, g.ref, commitHash)}
+            />
           ))}
         </Box>
       )}
@@ -134,10 +154,12 @@ function RefChip({
   group,
   laneColor,
   colWidth,
+  onContextMenu,
 }: {
   group: GroupedRef;
   laneColor: string;
   colWidth: number;
+  onContextMenu?: (e: React.MouseEvent) => void;
 }) {
   const { ref, remote, isCurrent, isTag } = group;
   const bg = chipBg(laneColor, isCurrent ? 0.50 : 0.25);
@@ -154,6 +176,7 @@ function RefChip({
     <Box
       component="span"
       title={title}
+      onContextMenu={onContextMenu}
       sx={{
         display: "flex",
         alignItems: "center",
@@ -217,10 +240,12 @@ function RefExpandedRow({
   group,
   laneColor,
   isPrimary,
+  onContextMenu,
 }: {
   group: GroupedRef;
   laneColor: string;
   isPrimary?: boolean;
+  onContextMenu?: (e: React.MouseEvent) => void;
 }) {
   const { ref, remote, isCurrent, isTag } = group;
   const bg = chipBg(laneColor, isCurrent ? 0.50 : 0.25);
@@ -237,6 +262,7 @@ function RefExpandedRow({
 
   return (
     <Box
+      onContextMenu={onContextMenu}
       sx={{
         display: "flex",
         alignItems: "center",

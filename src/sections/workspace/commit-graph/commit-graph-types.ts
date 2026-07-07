@@ -16,6 +16,7 @@ export type CommitGraphProps = {
   creatingBranch?: boolean;
   onCancelCreateBranch?: () => void;
   onSubmitBranch?: (name: string) => void;
+  onRefresh?: (newPayload: RepoPayload) => void;
 };
 
 export type RowProps = {

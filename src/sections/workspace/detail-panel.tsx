@@ -15,9 +15,10 @@ type DetailPanelProps = {
   commit: SlimCommit | null;
   payload: RepoPayload | null;
   onClose: () => void;
+  rightOffset?: number;
 };
 
-export function DetailPanel({ open, commit, payload, onClose }: DetailPanelProps) {
+export function DetailPanel({ open, commit, payload, onClose, rightOffset = 0 }: DetailPanelProps) {
   const copyHash = useCallback((hash: string) => {
     navigator.clipboard.writeText(hash);
   }, []);
@@ -32,7 +33,7 @@ export function DetailPanel({ open, commit, payload, onClose }: DetailPanelProps
       <Box
         sx={{
           position: 'fixed',
-          right: 0,
+          right: rightOffset,
           top: 98 + 28, // titlebar(32) + menubar(28) + toolbar(38) + colhead(28)
           bottom: 26, // statusbar
           width: 300,

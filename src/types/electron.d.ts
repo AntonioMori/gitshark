@@ -1,5 +1,22 @@
 export type PullMode = 'default' | 'rebase' | 'ff-only';
 
+export interface FileStatus {
+  path: string;
+  status: 'M' | 'A' | 'D' | 'R' | 'C' | '?';
+}
+
+export interface GitStatusFilesResult {
+  staged: FileStatus[];
+  unstaged: FileStatus[];
+  error?: string;
+}
+
+export interface GitCommitResult {
+  payload?: RepoPayload;
+  output?: string;
+  error?: string;
+}
+
 export interface GitPullResult {
   payload?: RepoPayload;
   output?: string;
@@ -23,6 +40,11 @@ export interface ElectronAPI {
   gitPull: (repoPath: string, mode?: PullMode) => Promise<GitPullResult>;
   gitBranch: (repoPath: string, name: string) => Promise<GitBranchResult>;
   gitPush: (repoPath: string) => Promise<GitPushResult>;
+  gitStatusFiles: (repoPath: string) => Promise<GitStatusFilesResult>;
+  gitStageFile: (repoPath: string, filePath: string) => Promise<{ error?: string }>;
+  gitStageAll: (repoPath: string) => Promise<{ error?: string }>;
+  gitUnstageFile: (repoPath: string, filePath: string) => Promise<{ error?: string }>;
+  gitCommit: (repoPath: string, summary: string, description: string) => Promise<GitCommitResult>;
   winMinimize: () => void;
   winMaximize: () => void;
   winClose: () => void;

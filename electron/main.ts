@@ -612,6 +612,76 @@ ipcMain.handle('git-push', async (_event, repoPath: string) => {
   }
 });
 
+ipcMain.handle('git-status-files', async (_event, repoPath: string) => {
+  try {
+    const repo = resolveRepoRoot(repoPath);
+    const raw = runGit(repo, 'status', '--porcelain');
+    const staged: { path: string; status: string }[] = [];
+    const unstaged: { path: string; status: string }[] = [];
+    for (const line of raw.split('\n')) {
+      if (line.length < 4) continue;
+      const X = line[0];
+      const Y = line[1];
+      let filePath = line.slice(3);
+      if (filePath.includes(' -> ')) filePath = filePath.split(' -> ')[1];
+      filePath = filePath.trim();
+      if (!filePath) continue;
+      if (X !== ' ' && X !== '?') staged.push({ path: filePath, status: X });
+      if (Y !== ' ' || X === '?') unstaged.push({ path: filePath, status: X === '?' ? '?' : Y });
+    }
+    return { staged, unstaged };
+  } catch (err: any) {
+    return { error: err.message, staged: [], unstaged: [] };
+  }
+});
+
+ipcMain.handle('git-stage-file', async (_event, repoPath: string, filePath: string) => {
+  try {
+    const repo = resolveRepoRoot(repoPath);
+    runGit(repo, 'add', '--', filePath);
+    return {};
+  } catch (err: any) {
+    return { error: err.message };
+  }
+});
+
+ipcMain.handle('git-stage-all', async (_event, repoPath: string) => {
+  try {
+    const repo = resolveRepoRoot(repoPath);
+    runGit(repo, 'add', '-A');
+    return {};
+  } catch (err: any) {
+    return { error: err.message };
+  }
+});
+
+ipcMain.handle('git-unstage-file', async (_event, repoPath: string, filePath: string) => {
+  try {
+    const repo = resolveRepoRoot(repoPath);
+    try {
+      runGit(repo, 'restore', '--staged', '--', filePath);
+    } catch {
+      runGit(repo, 'reset', 'HEAD', '--', filePath);
+    }
+    return {};
+  } catch (err: any) {
+    return { error: err.message };
+  }
+});
+
+ipcMain.handle('git-commit', async (_event, repoPath: string, summary: string, description: string) => {
+  try {
+    const repo = resolveRepoRoot(repoPath);
+    const args = ['commit', '-m', summary];
+    if (description && description.trim()) args.push('-m', description.trim());
+    const output = runGit(repo, ...args);
+    const payload = await buildPayload(repo);
+    return { payload, output: output.trim() };
+  } catch (err: any) {
+    return { error: err.message };
+  }
+});
+
 // --- App lifecycle ---
 
 app.whenReady().then(createWindow);

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 
 import Box from '@mui/material/Box';
 import { Toaster, toast } from 'sonner';
@@ -13,10 +13,14 @@ import { WelcomeScreen } from 'src/sections/workspace/welcome-screen';
 import { CommitGraph } from 'src/sections/workspace/commit-graph/commit-graph';
 import { DetailPanel } from 'src/sections/workspace/detail-panel';
 import { StatusBar } from 'src/sections/workspace/status-bar';
+import { CommitSidebar, COMMIT_SIDEBAR_WIDTH } from './commit-sidebar';
 
 // ----------------------------------------------------------------------
 
 const MAX_TABS = 5;
+const SESSION_KEY = 'gitshark:session';
+
+type PersistedSession = { paths: string[]; activeIdx: number };
 
 type Tab = {
   payload: RepoPayload;
@@ -40,6 +44,55 @@ export function GitSharkLayout() {
       toast(msg);
     }
   }, []);
+
+  // Guard: only save after restore completes (prevents overwriting storage on first render)
+  const canSaveRef = useRef(false);
+
+  // Restore session on mount
+  useEffect(() => {
+    (async () => {
+      const raw = localStorage.getItem(SESSION_KEY);
+      if (raw) {
+        try {
+          const { paths, activeIdx } = JSON.parse(raw) as PersistedSession;
+          if (Array.isArray(paths) && paths.length > 0) {
+            const results = await Promise.allSettled(
+              paths.slice(0, MAX_TABS).map((p) => window.api.loadRepo(p))
+            );
+            const loaded: Tab[] = [];
+            const origIdxs: number[] = [];
+            results.forEach((r, i) => {
+              if (r.status === 'fulfilled' && r.value && !r.value.error) {
+                loaded.push({ payload: r.value, scrollTop: 0, selectedIdx: -1 });
+                origIdxs.push(i);
+              }
+            });
+            if (loaded.length > 0) {
+              setTabs(loaded);
+              const ai = origIdxs.indexOf(activeIdx);
+              setActiveTab(ai >= 0 ? ai : 0);
+            }
+          }
+        } catch {
+          // ignore corrupt data
+        }
+      }
+      canSaveRef.current = true;
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Persist session whenever tabs or activeTab change
+  useEffect(() => {
+    if (!canSaveRef.current) return;
+    localStorage.setItem(
+      SESSION_KEY,
+      JSON.stringify({
+        paths: tabs.map((t) => t.payload.repoPath),
+        activeIdx: activeTab,
+      } satisfies PersistedSession)
+    );
+  }, [tabs, activeTab]);
 
   const activePayload = activeTab >= 0 && tabs[activeTab] ? tabs[activeTab].payload : null;
   const activeSelected = activeTab >= 0 && tabs[activeTab] ? tabs[activeTab].selectedIdx : -1;
@@ -112,6 +165,16 @@ export function GitSharkLayout() {
         ...tab,
         selectedIdx: tab.selectedIdx === idx ? -1 : idx,
       };
+      return updated;
+    });
+  }, [activeTab]);
+
+  const handleRefresh = useCallback((newPayload: RepoPayload) => {
+    setTabs((prev) => {
+      const updated = [...prev];
+      if (updated[activeTab]) {
+        updated[activeTab] = { ...updated[activeTab], payload: newPayload };
+      }
       return updated;
     });
   }, [activeTab]);
@@ -225,18 +288,23 @@ export function GitSharkLayout() {
       )}
 
       {/* Workspace */}
-      <Box sx={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-        {activePayload ? (
-          <CommitGraph
-            payload={activePayload}
-            selectedIdx={activeSelected}
-            onSelectRow={selectRow}
-            creatingBranch={creatingBranch}
-            onCancelCreateBranch={() => setCreatingBranch(false)}
-            onSubmitBranch={handleCreateBranch}
-          />
-        ) : (
-          <WelcomeScreen onOpenRepo={openRepo} />
+      <Box sx={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+        <Box sx={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+          {activePayload ? (
+            <CommitGraph
+              payload={activePayload}
+              selectedIdx={activeSelected}
+              onSelectRow={selectRow}
+              creatingBranch={creatingBranch}
+              onCancelCreateBranch={() => setCreatingBranch(false)}
+              onSubmitBranch={handleCreateBranch}
+            />
+          ) : (
+            <WelcomeScreen onOpenRepo={openRepo} />
+          )}
+        </Box>
+        {activePayload && (
+          <CommitSidebar payload={activePayload} onRefresh={handleRefresh} />
         )}
       </Box>
 
@@ -246,6 +314,7 @@ export function GitSharkLayout() {
         commit={activeCommit}
         payload={activePayload}
         onClose={closeDetail}
+        rightOffset={activePayload ? COMMIT_SIDEBAR_WIDTH : 0}
       />
 
       <StatusBar payload={activePayload} />

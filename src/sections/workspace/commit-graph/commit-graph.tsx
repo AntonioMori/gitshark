@@ -182,17 +182,24 @@ export function CommitGraph({
     }
   };
 
-  const handleCheckout = async () => {
+  const handleCheckout = async (mode: 'local' | 'track' | 'detached' = 'local') => {
     if (!contextMenu) return;
     const name = contextMenu.ref.name;
+    const commitHash = contextMenu.commitHash;
     setContextMenu(null);
     try {
-      const result = await window.api.gitCheckoutBranch(payload.repoPath, name);
+      const result = await window.api.gitCheckoutBranch(payload.repoPath, name, mode, commitHash);
       if (result.error) {
         toast.error(result.error);
       } else if (result.payload) {
         onRefresh?.(result.payload);
-        toast.success(`Checkout de '${name}' realizado.`);
+        if (mode === 'detached') {
+          toast.success(`Checkout do commit ${commitHash.slice(0, 7)} (detached HEAD).`);
+        } else if (mode === 'track') {
+          toast.success(`Branch local '${name.replace(/^origin\//, '')}' criada com tracking de '${name}'.`);
+        } else {
+          toast.success(`Checkout de '${name}' realizado.`);
+        }
       }
     } catch (err: any) {
       toast.error(`Erro ao fazer checkout: ${err.message}`);
@@ -896,8 +903,10 @@ export function CommitGraph({
           const selectedBranch = contextMenu.ref.name;
           const currentBranch = payload.currentBranch;
           const isCurrent = selectedBranch === currentBranch;
+          const isRemote = contextMenu.ref.type === 'remote';
           const shortHash = contextMenu.commitHash.slice(0, 7);
           const childCount = getDescendantCount(contextMenu.commitHash);
+          const localName = selectedBranch.replace(/^origin\//, '');
 
           const menuStyle = {
             fontSize: 12.5,
@@ -949,12 +958,20 @@ export function CommitGraph({
 
             !isCurrent ? <Divider key="div2" sx={{ my: 0.5, borderColor: '#363635' }} /> : null,
 
-            // --- Section 3: Navegação e Espaços de Trabalho ---
-            !isCurrent ? (
-              <MenuItem key="checkout" onClick={handleCheckout} sx={menuStyle}>
+            // --- Section 3: Checkout ---
+            !isCurrent && !isRemote ? (
+              <MenuItem key="checkout-local" onClick={() => handleCheckout('local')} sx={menuStyle}>
                 Checkout {selectedBranch}
               </MenuItem>
             ) : null,
+            !isCurrent && isRemote ? (
+              <MenuItem key="checkout-track" onClick={() => handleCheckout('track')} sx={menuStyle}>
+                Checkout {localName} (track {selectedBranch})
+              </MenuItem>
+            ) : null,
+            <MenuItem key="checkout-commit" onClick={() => handleCheckout('detached')} sx={menuStyle}>
+              Checkout this commit ({shortHash})
+            </MenuItem>,
 
             !isCurrent ? <Divider key="div3" sx={{ my: 0.5, borderColor: '#363635' }} /> : null,
 

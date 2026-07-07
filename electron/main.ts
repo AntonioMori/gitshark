@@ -754,10 +754,17 @@ ipcMain.handle('git-commit', async (_event, repoPath: string, summary: string, d
   }
 });
 
-ipcMain.handle('git-checkout-branch', async (_event, repoPath: string, name: string) => {
+ipcMain.handle('git-checkout-branch', async (_event, repoPath: string, name: string, mode: 'local' | 'track' | 'detached' = 'local', commitHash?: string) => {
   try {
     const repo = resolveRepoRoot(repoPath);
-    runGit(repo, 'checkout', name);
+    if (mode === 'detached') {
+      runGit(repo, 'checkout', '--detach', commitHash || name);
+    } else if (mode === 'track') {
+      const localName = name.replace(/^origin\//, '');
+      runGit(repo, 'checkout', '-b', localName, name);
+    } else {
+      runGit(repo, 'checkout', name);
+    }
     const payload = await buildPayload(repo);
     return { payload };
   } catch (err: any) {

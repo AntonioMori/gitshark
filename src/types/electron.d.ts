@@ -52,7 +52,7 @@ export interface ElectronAPI {
   gitUnstageFile: (repoPath: string, filePath: string) => Promise<{ error?: string }>;
   gitCommitFiles: (repoPath: string, hash: string) => Promise<GitCommitFilesResult>;
   gitCommit: (repoPath: string, summary: string, description: string) => Promise<GitCommitResult>;
-  gitCheckoutBranch: (repoPath: string, name: string) => Promise<{ payload?: RepoPayload; error?: string }>;
+  gitCheckoutBranch: (repoPath: string, name: string, mode?: 'local' | 'track' | 'detached', commitHash?: string) => Promise<{ payload?: RepoPayload; error?: string }>;
   gitMergeBranch: (repoPath: string, selectedBranch: string, targetBranch: string) => Promise<{ payload?: RepoPayload; output?: string; error?: string }>;
   gitRebaseBranch: (repoPath: string, selectedBranch: string, targetBranch: string, interactive?: boolean) => Promise<{ payload?: RepoPayload; output?: string; error?: string }>;
   gitDeleteBranch: (repoPath: string, name: string, local: boolean, remote: boolean) => Promise<{ payload?: RepoPayload; error?: string }>;

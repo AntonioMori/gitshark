@@ -13,7 +13,7 @@ contextBridge.exposeInMainWorld('api', {
   gitUnstageFile: (repoPath: string, filePath: string) => ipcRenderer.invoke('git-unstage-file', repoPath, filePath),
   gitCommitFiles: (repoPath: string, hash: string) => ipcRenderer.invoke('git-commit-files', repoPath, hash),
   gitCommit: (repoPath: string, summary: string, description: string) => ipcRenderer.invoke('git-commit', repoPath, summary, description),
-  gitCheckoutBranch: (repoPath: string, name: string) => ipcRenderer.invoke('git-checkout-branch', repoPath, name),
+  gitCheckoutBranch: (repoPath: string, name: string, mode?: 'local' | 'track' | 'detached', commitHash?: string) => ipcRenderer.invoke('git-checkout-branch', repoPath, name, mode, commitHash),
   gitMergeBranch: (repoPath: string, selectedBranch: string, targetBranch: string) => ipcRenderer.invoke('git-merge-branch', repoPath, selectedBranch, targetBranch),
   gitRebaseBranch: (repoPath: string, selectedBranch: string, targetBranch: string, interactive?: boolean) => ipcRenderer.invoke('git-rebase-branch', repoPath, selectedBranch, targetBranch, interactive),
   gitDeleteBranch: (repoPath: string, name: string, local: boolean, remote: boolean) => ipcRenderer.invoke('git-delete-branch', repoPath, name, local, remote),

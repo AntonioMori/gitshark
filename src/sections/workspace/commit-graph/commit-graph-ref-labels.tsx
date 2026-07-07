@@ -26,12 +26,14 @@ const ICON = {
 export function RefLabels({
   groups,
   laneColor,
+  colWidth,
   isCreatingBranch,
   onCancel,
   onSubmit,
 }: {
   groups: GroupedRef[];
   laneColor: string;
+  colWidth: number;
   isCreatingBranch?: boolean;
   onCancel?: () => void;
   onSubmit?: (name: string) => void;
@@ -75,7 +77,7 @@ export function RefLabels({
           : undefined,
       }}
     >
-      <RefChip group={primary} laneColor={laneColor} />
+      <RefChip group={primary} laneColor={laneColor} colWidth={colWidth} />
 
       {hasOverflow && (
         <Box
@@ -131,9 +133,11 @@ export function RefLabels({
 function RefChip({
   group,
   laneColor,
+  colWidth,
 }: {
   group: GroupedRef;
   laneColor: string;
+  colWidth: number;
 }) {
   const { ref, remote, isCurrent, isTag } = group;
   const bg = chipBg(laneColor, isCurrent ? 0.50 : 0.25);
@@ -167,7 +171,7 @@ function RefChip({
         overflow: "hidden",
         whiteSpace: "nowrap",
         minWidth: 0,
-        maxWidth: 120,
+        maxWidth: Math.max(60, colWidth - 16),
       }}
     >
       {isCurrent && (

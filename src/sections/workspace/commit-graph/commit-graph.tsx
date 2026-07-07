@@ -1,4 +1,4 @@
-import { useRef, useMemo, useCallback } from "react";
+import { useRef, useMemo, useCallback, useState } from "react";
 
 import Box from "@mui/material/Box";
 
@@ -38,13 +38,34 @@ export function CommitGraph({
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const labelsW = useMemo(() => {
-    let maxChars = 0;
-    for (const c of payload.commits)
-      for (const r of c.r)
-        maxChars = Math.max(maxChars, Math.min(r.name.length, 26));
-    return Math.min(260, Math.max(150, maxChars * 7.2 + 60));
-  }, [payload.commits]);
+  const [labelsW, setLabelsW] = useState(120);
+
+  const resizingRef = useRef(false);
+  const resizeStartX = useRef(0);
+  const resizeStartW = useRef(0);
+
+  const handleResizeStart = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      resizingRef.current = true;
+      resizeStartX.current = e.clientX;
+      resizeStartW.current = labelsW;
+
+      const onMove = (ev: MouseEvent) => {
+        if (!resizingRef.current) return;
+        const newW = Math.min(480, Math.max(100, resizeStartW.current + ev.clientX - resizeStartX.current));
+        setLabelsW(newW);
+      };
+      const onUp = () => {
+        resizingRef.current = false;
+        window.removeEventListener("mousemove", onMove);
+        window.removeEventListener("mouseup", onUp);
+      };
+      window.addEventListener("mousemove", onMove);
+      window.addEventListener("mouseup", onUp);
+    },
+    [labelsW],
+  );
 
   const { headIdx, headCommit } = useMemo(() => {
     const idx = payload.commits.findIndex((c) => c.h === payload.headHash);
@@ -228,7 +249,6 @@ export function CommitGraph({
           display: "grid",
           gridTemplateColumns: `${labelsW}px ${graphW}px 1fr`,
           height: 28,
-          alignItems: "center",
           bgcolor: "background.paper",
           borderBottom: "1px solid",
           borderColor: "divider",
@@ -237,19 +257,76 @@ export function CommitGraph({
           color: "text.secondary",
           textTransform: "uppercase",
           userSelect: "none",
-          "& > div": { px: "12px", whiteSpace: "nowrap", overflow: "hidden" },
-          "& > div + div": {
-            borderLeft: "1px solid",
-            borderColor: "divider",
+        }}
+      >
+        {/* Branch / Tag — resizable */}
+        <Box
+          sx={{
+            position: "relative",
+            px: "12px",
             height: "100%",
             display: "flex",
             alignItems: "center",
-          },
-        }}
-      >
-        <div>Branch / Tag</div>
-        <div>Graph</div>
-        <div>Commit Message</div>
+            overflow: "hidden",
+            whiteSpace: "nowrap",
+          }}
+        >
+          Branch / Tag
+          <Box
+            onMouseDown={handleResizeStart}
+            sx={{
+              position: "absolute",
+              top: 0,
+              right: 0,
+              width: 5,
+              height: "100%",
+              cursor: "col-resize",
+              zIndex: 10,
+              "&:hover::after": {
+                content: '""',
+                display: "block",
+                position: "absolute",
+                top: "20%",
+                right: 1,
+                width: 2,
+                height: "60%",
+                borderRadius: 1,
+                bgcolor: "primary.main",
+                opacity: 0.6,
+              },
+            }}
+          />
+        </Box>
+        {/* Graph */}
+        <Box
+          sx={{
+            px: "12px",
+            height: "100%",
+            display: "flex",
+            alignItems: "center",
+            overflow: "hidden",
+            whiteSpace: "nowrap",
+            borderLeft: "1px solid",
+            borderColor: "divider",
+          }}
+        >
+          Graph
+        </Box>
+        {/* Commit Message */}
+        <Box
+          sx={{
+            px: "12px",
+            height: "100%",
+            display: "flex",
+            alignItems: "center",
+            overflow: "hidden",
+            whiteSpace: "nowrap",
+            borderLeft: "1px solid",
+            borderColor: "divider",
+          }}
+        >
+          Commit Message
+        </Box>
       </Box>
 
       <Box
@@ -342,6 +419,7 @@ export function CommitGraph({
                 <RefLabels
                   groups={grouped}
                   laneColor={color}
+                  colWidth={labelsW}
                   isCreatingBranch={isHeadRow && creatingBranch}
                   onCancel={onCancelCreateBranch}
                   onSubmit={onSubmitBranch}

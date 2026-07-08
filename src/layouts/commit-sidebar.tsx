@@ -82,9 +82,10 @@ type Props = {
   onRefresh: (newPayload: RepoPayload) => void;
   onSelectFile?: (path: string, context: 'staged' | 'unstaged') => void;
   selectedFile?: string | null;
+  onCommitSuccess?: () => void;
 };
 
-export function CommitSidebar({ payload, onRefresh, onSelectFile, selectedFile }: Props) {
+export function CommitSidebar({ payload, onRefresh, onSelectFile, selectedFile, onCommitSuccess }: Props) {
   const [staged, setStaged] = useState<FileStatus[]>([]);
   const [unstaged, setUnstaged] = useState<FileStatus[]>([]);
   const [unstagedOpen, setUnstagedOpen] = useState(true);
@@ -167,6 +168,7 @@ export function CommitSidebar({ payload, onRefresh, onSelectFile, selectedFile }
         await loadStatus();
         if (result.payload) onRefresh(result.payload);
         toast.success("Commit realizado com sucesso.");
+        onCommitSuccess?.();
         if (pushAfterCommit) {
           toast.loading("Executando push...", { id: "push-loading" });
           try {
@@ -197,6 +199,7 @@ export function CommitSidebar({ payload, onRefresh, onSelectFile, selectedFile }
     description,
     loadStatus,
     onRefresh,
+    onCommitSuccess,
     pushAfterCommit,
   ]);
 

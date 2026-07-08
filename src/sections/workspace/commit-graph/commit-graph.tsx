@@ -44,7 +44,7 @@ export function CommitGraph({
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const [labelsW, setLabelsW] = useState(120);
+  const [labelsW, setLabelsW] = useState(240);
 
   const [contextMenu, setContextMenu] = useState<{
     mouseX: number;

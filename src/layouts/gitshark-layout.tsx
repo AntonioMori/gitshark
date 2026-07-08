@@ -354,6 +354,7 @@ export function GitSharkLayout() {
               onRefresh={handleRefresh}
               selectedFile={diffTarget?.path}
               onSelectFile={(path, ctx) => handleSelectFileForDiff(path, ctx)}
+              onCommitSuccess={closeDiff}
             />
           )
         )}

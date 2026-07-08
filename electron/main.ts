@@ -552,6 +552,7 @@ function createWindow() {
     minWidth: 900,
     minHeight: 500,
     title: 'GitShark',
+    icon: path.join(app.getAppPath(), 'src/assets/logo/logo.png'),
     frame: false,
     backgroundColor: '#1a1f24',
     webPreferences: {

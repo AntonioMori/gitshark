@@ -10,7 +10,26 @@
     "preview": "electron-vite preview",
     "lint": "eslint \"src/**/*.{ts,tsx}\"",
     "lint:fix": "eslint --fix \"src/**/*.{ts,tsx}\"",
-    "tsc:check": "tsc --noEmit --pretty"
+    "tsc:check": "tsc --noEmit --pretty",
+    "dist": "npm run build && electron-builder"
+  },
+  "build": {
+    "appId": "com.gitshark.app",
+    "productName": "GitShark",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "out/**/*",
+      "package.json",
+      "src/assets/logo/logo.png"
+    ],
+    "win": {
+      "icon": "src/assets/logo/logo-inteira.png",
+      "target": [
+        "nsis"
+      ]
+    }
   },
   "author": "GitShark",
   "license": "MIT",
@@ -48,6 +67,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
     "electron": "^35.0.0",
+    "electron-builder": "^26.15.3",
     "electron-vite": "^6.0.0-beta.1",
     "typescript": "^5.9.3",
     "vite": "^8.0.12"

@@ -132,12 +132,12 @@ export function CommitGraph({
     const currentBranch = payload.currentBranch;
     setContextMenu(null);
     try {
-      const result = await window.api.gitMergeBranch(payload.repoPath, selectedBranch, currentBranch);
+      const result = await window.api.gitMergeBranch(payload.repoPath, currentBranch, selectedBranch);
       if (result.error) {
         toast.error(result.error);
       } else if (result.payload) {
         onRefresh?.(result.payload);
-        toast.success(`Fast-forward ${currentBranch} para ${selectedBranch} realizado com sucesso.`);
+        toast.success(`Fast-forward ${selectedBranch} para ${currentBranch} realizado com sucesso.`);
       }
     } catch (err: any) {
       toast.error(`Erro ao executar fast-forward: ${err.message}`);
@@ -150,12 +150,12 @@ export function CommitGraph({
     const currentBranch = payload.currentBranch;
     setContextMenu(null);
     try {
-      const result = await window.api.gitMergeBranch(payload.repoPath, selectedBranch, currentBranch);
+      const result = await window.api.gitMergeBranch(payload.repoPath, currentBranch, selectedBranch);
       if (result.error) {
         toast.error(result.error);
       } else if (result.payload) {
         onRefresh?.(result.payload);
-        toast.success(`Branch ${selectedBranch} mesclada em ${currentBranch}.`);
+        toast.success(`Branch ${currentBranch} mesclada em ${selectedBranch}.`);
       }
     } catch (err: any) {
       toast.error(`Erro ao mesclar branch: ${err.message}`);
@@ -168,15 +168,15 @@ export function CommitGraph({
     const currentBranch = payload.currentBranch;
     setContextMenu(null);
     try {
-      const result = await window.api.gitRebaseBranch(payload.repoPath, selectedBranch, currentBranch, interactive);
+      const result = await window.api.gitRebaseBranch(payload.repoPath, currentBranch, selectedBranch, interactive);
       if (result.error) {
         toast.error(result.error);
       } else if (result.payload) {
         onRefresh?.(result.payload);
         if (interactive) {
-          toast.success(`Rebase interativo (Simulado/Mocked) de ${selectedBranch} em ${currentBranch} realizado com sucesso.`);
+          toast.success(`Rebase interativo (Simulado/Mocked) de ${currentBranch} em ${selectedBranch} realizado com sucesso.`);
         } else {
-          toast.success(`Rebase de ${selectedBranch} em ${currentBranch} realizado com sucesso.`);
+          toast.success(`Rebase de ${currentBranch} em ${selectedBranch} realizado com sucesso.`);
         }
       }
     } catch (err: any) {
@@ -990,22 +990,22 @@ export function CommitGraph({
             // --- Section 2: Integração de Código (Mesclagem) ---
             !isCurrent ? (
               <MenuItem key="ff" onClick={handleFastForward} sx={menuStyle}>
-                Fast-forward {currentBranch} to {selectedBranch}
+                Fast-forward {selectedBranch} to {currentBranch}
               </MenuItem>
             ) : null,
             !isCurrent ? (
               <MenuItem key="merge" onClick={handleMerge} sx={menuStyle}>
-                Merge {selectedBranch} into {currentBranch}
+                Merge {currentBranch} into {selectedBranch}
               </MenuItem>
             ) : null,
             !isCurrent ? (
               <MenuItem key="rebase" onClick={() => handleRebase(false)} sx={menuStyle}>
-                Rebase {selectedBranch} onto {currentBranch}
+                Rebase {currentBranch} onto {selectedBranch}
               </MenuItem>
             ) : null,
             !isCurrent ? (
               <MenuItem key="irebase" onClick={() => handleRebase(true)} sx={menuStyle}>
-                Interactive Rebase {selectedBranch} onto {currentBranch}
+                Interactive Rebase {currentBranch} onto {selectedBranch}
               </MenuItem>
             ) : null,
 

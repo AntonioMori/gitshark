@@ -790,4 +790,10 @@ export default {
   "ic:baseline-arrow-right": {
     body: '<path fill="currentColor" d="m10 17l5-5l-5-5z"/>',
   },
+  "ic:baseline-minus": {
+    body: '<path fill="currentColor" d="M19 13H5v-2h14z"/>',
+  },
+  "custom:loader": {
+    body: '<path fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" d="M20 12a8 8 0 1 1-8-8"/>',
+  },
 };

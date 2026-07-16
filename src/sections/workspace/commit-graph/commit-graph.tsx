@@ -688,6 +688,7 @@ export function CommitGraph({
           height: "100%",
           fontFamily: FONT,
           "--row-h": `${ROW_H}px`,
+          "--row-stride": `${ROW_STRIDE}px`,
         } as React.CSSProperties & Record<string, unknown>
       }
     >
@@ -799,7 +800,7 @@ export function CommitGraph({
             position: "relative",
             display: "flex",
             flexDirection: "column",
-            gap: "6px",
+            gap: "0px",
           }}
           onClick={handleRowClick}
         >
@@ -816,7 +817,7 @@ export function CommitGraph({
             dangerouslySetInnerHTML={{ __html: svgContent }}
           />
 
-          <Box sx={{ flexShrink: 0, height: ROW_H }} />
+          <Box sx={{ flexShrink: 0, height: ROW_STRIDE }} />
 
           {hasWip && (
             <Row
@@ -884,11 +885,14 @@ export function CommitGraph({
                 />
                 <div />
                 <Box
+                  className="commit-msg-col"
                   sx={{
                     display: "flex",
                     alignItems: "center",
                     gap: "10px",
                     px: "8px",
+                    height: "var(--row-h)",
+                    borderRadius: "2px",
                     overflow: "hidden",
                     whiteSpace: "nowrap",
                   }}
@@ -917,7 +921,6 @@ export function CommitGraph({
                       fontSize: 11,
                       flexShrink: 0,
                       opacity: 0,
-                      transition: "opacity .12s",
                     }}
                   >
                     {c.a.split(" ")[0]} · {relTime(c.d)}

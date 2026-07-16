@@ -10,14 +10,14 @@ export function Row({ children, gridCols, sx, ...props }: RowProps) {
       {...props}
       sx={{
         flexShrink: 0,
-        height: "var(--row-h)",
-        minHeight: "var(--row-h)",
-        maxHeight: "var(--row-h)",
+        height: "var(--row-stride, var(--row-h))",
+        minHeight: "var(--row-stride, var(--row-h))",
+        maxHeight: "var(--row-stride, var(--row-h))",
         display: "grid",
         gridTemplateColumns: gridCols,
-        alignItems: "stretch",
+        alignItems: "center",
         cursor: "pointer",
-        "&:hover": { bgcolor: "rgba(255,255,255,0.045)" },
+        "&:hover .commit-msg-col": { bgcolor: "#212939" },
         "&:hover .when": { opacity: 1 },
         ...sx,
       }}

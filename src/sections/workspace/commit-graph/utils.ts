@@ -17,7 +17,7 @@ export function laneX(l: number) {
   return GRAPH_PAD + l * LANE_W + LANE_W / 2;
 }
 export function rowY(r: number) {
-  return r * ROW_STRIDE + ROW_H / 2;
+  return r * ROW_STRIDE + ROW_STRIDE / 2;
 }
 
 // ----------------------------------------------------------------------

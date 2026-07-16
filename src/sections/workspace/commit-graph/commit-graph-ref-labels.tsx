@@ -105,7 +105,6 @@ export function RefLabels({
             fontFamily: FONT,
             color: "rgba(255, 255, 255, 0.75)",
             flexShrink: 0,
-            transition: "opacity .1s",
           }}
         >
           +{overflow.length}

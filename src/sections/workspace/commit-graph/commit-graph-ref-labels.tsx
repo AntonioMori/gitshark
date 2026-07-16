@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import Box from "@mui/material/Box";
 
 import type { GroupedRef } from "./commit-graph-types";
-import type { RepoRef } from "src/types/electron";
+import type { SlimCommit, RepoRef } from "src/types/electron";
 import { chipBg, FONT } from "./utils";
 
 // ----------------------------------------------------------------------
@@ -24,6 +24,27 @@ const ICON = {
 
 // ----------------------------------------------------------------------
 
+function findBranchNameForCommit(c: SlimCommit, commits: SlimCommit[]): string | null {
+  const selfBranch = c.r.find(ref => ref.type === 'head_branch' || ref.type === 'branch');
+  if (selfBranch) return selfBranch.name;
+
+  for (const other of commits) {
+    if (other.k === c.k) {
+      const ref = other.r.find(ref => ref.type === 'head_branch' || ref.type === 'branch');
+      if (ref) return ref.name;
+    }
+  }
+
+  for (const other of commits) {
+    if (other.k === c.k) {
+      const ref = other.r.find(ref => ref.type === 'remote');
+      if (ref) return ref.name;
+    }
+  }
+
+  return null;
+}
+
 export function RefLabels({
   groups,
   laneColor,
@@ -33,6 +54,9 @@ export function RefLabels({
   onSubmit,
   commitHash,
   onRefContextMenu,
+  isHovered,
+  commits,
+  currentBranch,
 }: {
   groups: GroupedRef[];
   laneColor: string;
@@ -42,6 +66,9 @@ export function RefLabels({
   onSubmit?: (name: string) => void;
   commitHash: string;
   onRefContextMenu?: (e: React.MouseEvent, ref: RepoRef, commitHash: string) => void;
+  isHovered?: boolean;
+  commits?: SlimCommit[];
+  currentBranch?: string;
 }) {
   if (isCreatingBranch) {
     return (
@@ -59,7 +86,41 @@ export function RefLabels({
     );
   }
 
-  if (groups.length === 0) return <div />;
+  if (groups.length === 0) {
+    if (isHovered && commits && currentBranch) {
+      const c = commits.find(x => x.h === commitHash);
+      const previewBranchName = c ? findBranchNameForCommit(c, commits) : null;
+      if (previewBranchName) {
+        const fakeGroup = {
+          ref: {
+            type: (previewBranchName === currentBranch ? "head_branch" : "branch") as const,
+            name: previewBranchName,
+          },
+          isCurrent: previewBranchName === currentBranch,
+          isTag: false,
+        };
+        return (
+          <Box
+            sx={{
+              position: "relative",
+              display: "flex",
+              alignItems: "stretch",
+              gap: "4px",
+              zIndex: 0,
+            }}
+          >
+            <RefChip
+              group={fakeGroup}
+              laneColor={laneColor}
+              colWidth={colWidth}
+              isPreview
+            />
+          </Box>
+        );
+      }
+    }
+    return <div />;
+  }
 
   const primary = groups[0];
   const overflow = groups.slice(1);
@@ -155,11 +216,13 @@ function RefChip({
   laneColor,
   colWidth,
   onContextMenu,
+  isPreview,
 }: {
   group: GroupedRef;
   laneColor: string;
   colWidth: number;
   onContextMenu?: (e: React.MouseEvent) => void;
+  isPreview?: boolean;
 }) {
   const { ref, remote, isCurrent, isTag } = group;
   const bg = chipBg(laneColor, isCurrent ? 0.50 : 0.25);
@@ -196,6 +259,10 @@ function RefChip({
         whiteSpace: "nowrap",
         minWidth: 0,
         maxWidth: Math.max(60, colWidth - 16),
+        ...(isPreview && {
+          opacity: isCurrent ? 0.5 : 0.25,
+          pointerEvents: "none",
+        }),
       }}
     >
       {isCurrent && (

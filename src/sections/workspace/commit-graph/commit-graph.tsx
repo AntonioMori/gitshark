@@ -45,6 +45,7 @@ export function CommitGraph({
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const [labelsW, setLabelsW] = useState(240);
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
 
   const [contextMenu, setContextMenu] = useState<{
     mouseX: number;
@@ -872,6 +873,8 @@ export function CommitGraph({
                 data-i={i}
                 style={{ "--chip-color": color } as React.CSSProperties}
                 gridCols={`${labelsW}px ${graphW}px 1fr`}
+                onMouseEnter={() => setHoveredIdx(i)}
+                onMouseLeave={() => setHoveredIdx(null)}
               >
                 <RefLabels
                   groups={grouped}
@@ -882,6 +885,9 @@ export function CommitGraph({
                   onSubmit={onSubmitBranch}
                   commitHash={c.h}
                   onRefContextMenu={handleRefContextMenu}
+                  isHovered={hoveredIdx === i}
+                  commits={payload.commits}
+                  currentBranch={payload.currentBranch}
                 />
                 <div />
                 <Box

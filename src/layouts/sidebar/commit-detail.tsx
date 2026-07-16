@@ -423,11 +423,13 @@ export function CommitDetail({ commit, payload, onClose, onSelectFile, selectedF
 // ----------------------------------------------------------------------
 
 function DetailFileItem({ file, selected, onSelect }: { file: FileStatus; selected?: boolean; onSelect?: () => void }) {
-  const info = STATUS_ICON[file.status] ?? STATUS_ICON["?"];
+  const info = STATUS_ICON[file.status] ?? STATUS_ICON["unknown"];
   const normalized = file.path.replace(/\\/g, "/");
   const slash = normalized.lastIndexOf("/");
   const dir = slash >= 0 ? normalized.slice(0, slash + 1) : "";
   const name = slash >= 0 ? normalized.slice(slash + 1) : normalized;
+
+  const isAddOrMinus = info.icon === "ic:baseline-add" || info.icon === "ic:baseline-minus";
 
   return (
     <Box
@@ -448,22 +450,45 @@ function DetailFileItem({ file, selected, onSelect }: { file: FileStatus; select
     >
       <Iconify
         icon={info.icon}
-        width={15}
-        sx={{ color: info.color, flexShrink: 0 }}
+        width={isAddOrMinus ? 17 : 15}
+        sx={{ color: info.color, flexShrink: 0, opacity: 1 }}
       />
       <Typography
-        noWrap
         sx={{
-          fontSize: 13.5,
+          fontSize: 13,
+          display: "flex",
+          alignItems: "center",
           minWidth: 0,
+          flexGrow: 1,
           letterSpacing: 0.25,
-          fontFamily: "Inter",
+          fontFamily: "'Open Sans Variable', 'Open Sans', sans-serif !important",
         }}
       >
-        <span style={{ color: "#777d88", fontWeight: 500 }}>{dir}</span>
-        <span style={{ color: "rgba(255,255,255,0.8)", fontWeight: 400 }}>
+        <Box
+          component="span"
+          sx={{
+            textOverflow: "ellipsis",
+            overflow: "hidden",
+            whiteSpace: "nowrap",
+            color: "#777d88",
+            fontWeight: 500,
+            minWidth: 0,
+            flexShrink: 1,
+          }}
+        >
+          {dir}
+        </Box>
+        <Box
+          component="span"
+          sx={{
+            whiteSpace: "nowrap",
+            color: "rgba(255,255,255,0.8)",
+            fontWeight: 400,
+            flexShrink: 0,
+          }}
+        >
           {name}
-        </span>
+        </Box>
       </Typography>
     </Box>
   );

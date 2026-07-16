@@ -11,15 +11,16 @@ export const GREEN = "#2ea44f";
 export const TEAL = "#005f73";
 export const RED_BG = "#4a2f33";
 export const BORDER = "rgba(255,255,255,0.08)";
-export const FONT = '"Inter Variable", Inter, sans-serif';
+export const FONT = '"Open Sans Variable", "Open Sans", sans-serif';
 
 export const STATUS_ICON: Record<string, { icon: IconifyName; color: string }> =
   {
     M: { icon: "mdi:pencil", color: "#de9b43" },
     A: { icon: "ic:baseline-add", color: "#5cb85c" },
-    D: { icon: "mdi:minus-circle-outline", color: "#ef4444" },
+    D: { icon: "ic:baseline-minus", color: "#ef4444" },
     R: { icon: "mdi:arrow-right-circle-outline", color: "#a78bfa" },
-    "?": { icon: "mdi:help-circle-outline", color: MUTED },
+    "?": { icon: "ic:baseline-add", color: "#5cb85c" },
+    unknown: { icon: "mdi:help-circle-outline", color: MUTED },
   };
 
 export const iconBtn = {

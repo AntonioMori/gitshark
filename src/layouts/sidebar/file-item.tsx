@@ -19,13 +19,14 @@ type Props = {
 };
 
 export function FileItem({ file, staged, selected, onClick, onSelect }: Props) {
-  const info = STATUS_ICON[file.status] ?? STATUS_ICON["?"];
+  const info = STATUS_ICON[file.status] ?? STATUS_ICON["unknown"];
   const normalized = file.path.replace(/\\/g, "/");
   const slash = normalized.lastIndexOf("/");
   const dir = slash >= 0 ? normalized.slice(0, slash + 1) : "";
   const name = slash >= 0 ? normalized.slice(slash + 1) : normalized;
 
   const isStaged = !!staged;
+  const isAddOrMinus = info.icon === "ic:baseline-add" || info.icon === "ic:baseline-minus";
 
   return (
     <Box
@@ -43,9 +44,10 @@ export function FileItem({ file, staged, selected, onClick, onSelect }: Props) {
         border: "none",
         cursor: "pointer",
         textAlign: "left",
+        position: "relative",
         "&:hover": {
           bgcolor: selected ? "rgba(91,155,213,0.2)" : "#2b3446",
-          "& .file-action-btn": { opacity: 1 },
+          "& .file-action-btn": { opacity: 1, visibility: "visible" },
         },
         outline: "none",
         overflow: "hidden",
@@ -54,28 +56,45 @@ export function FileItem({ file, staged, selected, onClick, onSelect }: Props) {
     >
       <Iconify
         icon={info.icon}
-        width={14}
-        sx={{ color: info.color, flexShrink: 0 }}
+        width={isAddOrMinus ? 16 : 14}
+        sx={{ color: info.color, flexShrink: 0, opacity: 1 }}
       />
       <Typography
-        noWrap
         sx={{
-          fontSize: 14,
-          minWidth: 0,
-          alignSelf: "center",
-          justifySelf: "center",
+          fontSize: 13,
           display: "flex",
           alignItems: "center",
+          minWidth: 0,
+          flexGrow: 1,
           lineHeight: 1.4,
-          fontFamily: "'Segoe UI', sans-serif !important",
+          fontFamily: "'Open Sans Variable', 'Open Sans', sans-serif !important",
         }}
       >
-        <span style={{ color: "#777d88" }}>{dir}</span>
-        <span style={{ color: "rgba(255,255,255,0.7)", fontWeight: 500 }}>
+        <Box
+          component="span"
+          sx={{
+            textOverflow: "ellipsis",
+            overflow: "hidden",
+            whiteSpace: "nowrap",
+            color: "#777d88",
+            minWidth: 0,
+            flexShrink: 1,
+          }}
+        >
+          {dir}
+        </Box>
+        <Box
+          component="span"
+          sx={{
+            whiteSpace: "nowrap",
+            color: "rgba(255,255,255,0.7)",
+            fontWeight: 500,
+            flexShrink: 0,
+          }}
+        >
           {name}
-        </span>
+        </Box>
       </Typography>
-      <Box sx={{ flex: 1 }} />
       <Box
         component="span"
         className="file-action-btn"
@@ -85,7 +104,8 @@ export function FileItem({ file, staged, selected, onClick, onSelect }: Props) {
         }}
         sx={{
           opacity: 0,
-          transition: "opacity 0.15s",
+          visibility: "hidden",
+          transition: "opacity 0.15s, visibility 0.15s",
           fontSize: 12,
           color: "rgba(255,255,255,0.8)",
           fontWeight: 500,
@@ -94,6 +114,11 @@ export function FileItem({ file, staged, selected, onClick, onSelect }: Props) {
           px: 0.75,
           py: "3px",
           bgcolor: isStaged ? "#4a2f33" : "#314739",
+          position: "absolute",
+          right: "12px",
+          top: "50%",
+          transform: "translateY(-50%)",
+          zIndex: 1,
           flexShrink: 0,
           "&:hover": isStaged
             ? { bgcolor: "#923839", borderColor: "#923839" }

@@ -30,8 +30,9 @@ export function TreeNodeView({
   onSelectFile,
 }: Props) {
   if (!node.isDir && node.file) {
-    const info = STATUS_ICON[node.file.status] ?? STATUS_ICON["?"];
+    const info = STATUS_ICON[node.file.status] ?? STATUS_ICON["unknown"];
     const isSelected = selectedFile === node.fullPath;
+    const isAddOrMinus = info.icon === "ic:baseline-add" || info.icon === "ic:baseline-minus";
     return (
       <Box
         component="button"
@@ -57,8 +58,8 @@ export function TreeNodeView({
       >
         <Iconify
           icon={info.icon}
-          width={13}
-          sx={{ color: info.color, flexShrink: 0 }}
+          width={isAddOrMinus ? 15 : 13}
+          sx={{ color: info.color, flexShrink: 0, opacity: 1 }}
         />
         <Typography
           noWrap

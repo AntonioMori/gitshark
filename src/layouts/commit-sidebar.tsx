@@ -34,49 +34,6 @@ export { COMMIT_SIDEBAR_WIDTH };
 
 // ----------------------------------------------------------------------
 
-const StageAllBtn = (
-  <Box
-    sx={{
-      fontSize: 12,
-      color: "rgba(255,255,255,0.8)",
-      fontWeight: 500,
-      border: "1px solid #5cb85c",
-      borderRadius: "2px",
-      px: 1,
-      py: "4px",
-      bgcolor: "#314739",
-      transition: "all 0.1s",
-      "&:hover": { bgcolor: "#477f4b", borderColor: "#477f4b" },
-      pointerEvents: "auto",
-    }}
-  >
-    Stage All Changes
-  </Box>
-);
-
-const UnstageAllBtn = (
-  <Box
-    sx={{
-      fontSize: 12,
-      color: "rgba(255,255,255,0.8)",
-      fontWeight: 500,
-      border: "1px solid #d9413d",
-      borderRadius: "2px",
-      px: 1,
-      py: "4px",
-      bgcolor: "#4a2f33",
-      transition: "all 0.1s",
-      "&:hover": { bgcolor: "#923839", borderColor: "#923839" },
-      pointerEvents: "auto",
-      
-    }}
-  >
-    Unstage All
-  </Box>
-);
-
-// ----------------------------------------------------------------------
-
 type Props = {
   payload: RepoPayload;
   onRefresh: (newPayload: RepoPayload) => void;
@@ -100,6 +57,8 @@ export function CommitSidebar({ payload, onRefresh, onSelectFile, selectedFile, 
   const [discardOpen, setDiscardOpen] = useState(false);
   const [showOptions, setShowOptions] = useState(false);
   const [pushAfterCommit, setPushAfterCommit] = useState(false);
+  const [stagingAll, setStagingAll] = useState(false);
+  const [unstagingAll, setUnstagingAll] = useState(false);
 
   const loadStatus = useCallback(async () => {
     const result = await window.api.gitStatusFiles(payload.repoPath);
@@ -114,9 +73,15 @@ export function CommitSidebar({ payload, onRefresh, onSelectFile, selectedFile, 
   }, [payload, loadStatus]);
 
   const handleStageAll = useCallback(async () => {
-    await window.api.gitStageAll(payload.repoPath);
-    await loadStatus();
-  }, [payload.repoPath, loadStatus]);
+    if (stagingAll) return;
+    setStagingAll(true);
+    try {
+      await window.api.gitStageAll(payload.repoPath);
+      await loadStatus();
+    } finally {
+      setStagingAll(false);
+    }
+  }, [payload.repoPath, loadStatus, stagingAll]);
 
   const handleStageFile = useCallback(
     async (p: string) => {
@@ -135,11 +100,17 @@ export function CommitSidebar({ payload, onRefresh, onSelectFile, selectedFile, 
   );
 
   const handleUnstageAll = useCallback(async () => {
-    await Promise.all(
-      staged.map((f) => window.api.gitUnstageFile(payload.repoPath, f.path)),
-    );
-    await loadStatus();
-  }, [staged, payload.repoPath, loadStatus]);
+    if (unstagingAll) return;
+    setUnstagingAll(true);
+    try {
+      await Promise.all(
+        staged.map((f) => window.api.gitUnstageFile(payload.repoPath, f.path)),
+      );
+      await loadStatus();
+    } finally {
+      setUnstagingAll(false);
+    }
+  }, [staged, payload.repoPath, loadStatus, unstagingAll]);
 
   const handleDiscardConfirm = useCallback(async () => {
     setDiscardOpen(false);
@@ -216,6 +187,82 @@ export function CommitSidebar({ payload, onRefresh, onSelectFile, selectedFile, 
   const canCommit =
     staged.length > 0 && summary.trim().length > 0 && !committing;
   const remaining = SUMMARY_MAX - summary.length;
+
+  const stageAllBtn = (
+    <Box
+      sx={{
+        fontSize: 12,
+        color: "rgba(255,255,255,0.8)",
+        fontWeight: 500,
+        border: "1px solid #5cb85c",
+        borderRadius: "2px",
+        px: 1,
+        py: "4px",
+        bgcolor: "#314739",
+        transition: "all 0.1s",
+        "&:hover": !stagingAll ? { bgcolor: "#477f4b", borderColor: "#477f4b" } : {},
+        pointerEvents: stagingAll ? "none" : "auto",
+        display: "flex",
+        alignItems: "center",
+        gap: 0.5,
+        opacity: stagingAll ? 0.7 : 1,
+      }}
+    >
+      {stagingAll && (
+        <Iconify
+          icon="custom:loader"
+          width={12}
+          sx={{
+            color: TEXT,
+            animation: "spin 1s linear infinite",
+            "@keyframes spin": {
+              "0%": { transform: "rotate(0deg)" },
+              "100%": { transform: "rotate(360deg)" },
+            },
+          }}
+        />
+      )}
+      {stagingAll ? "Staging..." : "Stage All Changes"}
+    </Box>
+  );
+
+  const unstageAllBtn = (
+    <Box
+      sx={{
+        fontSize: 12,
+        color: "rgba(255,255,255,0.8)",
+        fontWeight: 500,
+        border: "1px solid #d9413d",
+        borderRadius: "2px",
+        px: 1,
+        py: "4px",
+        bgcolor: "#4a2f33",
+        transition: "all 0.1s",
+        "&:hover": !unstagingAll ? { bgcolor: "#923839", borderColor: "#923839" } : {},
+        pointerEvents: unstagingAll ? "none" : "auto",
+        display: "flex",
+        alignItems: "center",
+        gap: 0.5,
+        opacity: unstagingAll ? 0.7 : 1,
+      }}
+    >
+      {unstagingAll && (
+        <Iconify
+          icon="custom:loader"
+          width={12}
+          sx={{
+            color: TEXT,
+            animation: "spin 1s linear infinite",
+            "@keyframes spin": {
+              "0%": { transform: "rotate(0deg)" },
+              "100%": { transform: "rotate(360deg)" },
+            },
+          }}
+        />
+      )}
+      {unstagingAll ? "Unstaging..." : "Unstage All"}
+    </Box>
+  );
 
   return (
     <>
@@ -411,7 +458,7 @@ export function CommitSidebar({ payload, onRefresh, onSelectFile, selectedFile, 
               onFileClick={handleStageFile}
               onSelectFile={onSelectFile ? (p) => onSelectFile(p, 'unstaged') : undefined}
               onActionAll={handleStageAll}
-              actionBtn={StageAllBtn}
+              actionBtn={stageAllBtn}
               viewMode={viewMode}
               sortOrder={sortOrder}
               collapsedDirs={collapsedDirs}
@@ -427,7 +474,7 @@ export function CommitSidebar({ payload, onRefresh, onSelectFile, selectedFile, 
               onFileClick={handleUnstageFile}
               onSelectFile={onSelectFile ? (p) => onSelectFile(p, 'staged') : undefined}
               onActionAll={handleUnstageAll}
-              actionBtn={UnstageAllBtn}
+              actionBtn={unstageAllBtn}
               viewMode={viewMode}
               sortOrder={sortOrder}
               collapsedDirs={collapsedDirs}

@@ -515,6 +515,7 @@ export function CommitGraph({
     const graph: string[] = [];
     // GitKraken-style: rounded 90° elbows (quarter-circle arcs via Q bezier)
     const R_MAX = 10;
+    const COMMIT_R = 11;
 
     for (const e of payload.edges) {
       const cR = e.c[0] + off,
@@ -597,7 +598,7 @@ export function CommitGraph({
           `<path d="M${x} ${rowY(0)} L${x} ${rowY(headRow)}" fill="none" stroke="${color}" stroke-width="2" stroke-dasharray="2 5" stroke-linecap="round" opacity=".8"/>`,
         );
         graph.push(
-          `<circle cx="${x}" cy="${rowY(0)}" r="7" fill="var(--bg,#1a1f24)" stroke="${color}" stroke-width="1.6" stroke-dasharray="3 3"/>`,
+          `<circle cx="${x}" cy="${rowY(0)}" r="${COMMIT_R}" fill="var(--bg,#1a1f24)" stroke="${color}" stroke-width="1.6" stroke-dasharray="3 3"/>`,
         );
       }
     }
@@ -607,7 +608,8 @@ export function CommitGraph({
       const x = laneX(c.l),
         y = rowY(i + off);
       const color = PAL[c.k % PAL.length];
-      const r = 9;
+      const r = COMMIT_R;
+      const commitR = 9;
 
       if (c.r.length > 0) {
         const lineEnd = labelsW + laneX(c.l) - r - 2;
@@ -619,37 +621,35 @@ export function CommitGraph({
       }
       if (c.mg) {
         graph.push(
-          `<circle cx="${x}" cy="${y}" r="${r - 2}" fill="${color}"/>`,
-        );
-        graph.push(
-          `<circle cx="${x}" cy="${y}" r="2.5" fill="var(--bg,#1a1f24)"/>`,
+          `<circle cx="${x}" cy="${y}" r="${commitR}" fill="${color}"/>`,
         );
       } else {
         const avatarUrl = payload.avatars[c.g];
         if (avatarUrl) {
           const clipId = `av-${i}`;
-          const s = (r - 1) * 2;
+          const clipR = commitR - 0.75;
+          const s = clipR * 2;
           defs.push(
-            `<clipPath id="${clipId}"><circle cx="${x}" cy="${y}" r="${r - 1}"/></clipPath>`,
+            `<clipPath id="${clipId}"><circle cx="${x}" cy="${y}" r="${clipR}"/></clipPath>`,
           );
           graph.push(
-            `<circle cx="${x}" cy="${y}" r="${r}" fill="#1c1e23" stroke="${color}" stroke-width="2"/>`,
+            `<circle cx="${x}" cy="${y}" r="${commitR}" fill="#1c1e23" stroke="${color}" stroke-width="1.8"/>`,
           );
           graph.push(
-            `<image href="${avatarUrl}" x="${x - r + 1}" y="${y - r + 1}" width="${s}" height="${s}" clip-path="url(#${clipId})"/>`,
+            `<image href="${avatarUrl}" x="${x - clipR}" y="${y - clipR}" width="${s}" height="${s}" clip-path="url(#${clipId})"/>`,
           );
         } else {
           graph.push(
-            `<circle cx="${x}" cy="${y}" r="${r}" fill="hsl(${c.hu} 45% 55%)" stroke="${color}" stroke-width="2"/>`,
+            `<circle cx="${x}" cy="${y}" r="${commitR}" fill="hsl(${c.hu} 45% 55%)" stroke="${color}" stroke-width="1.8"/>`,
           );
           graph.push(
-            `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="middle" font-size="${r * 0.72}" font-weight="700" fill="#fff" font-family="'Open Sans Variable', 'Open Sans', sans-serif">${esc(c.i)}</text>`,
+            `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="middle" font-size="${commitR * 0.72}" font-weight="700" fill="#fff" font-family="'Open Sans Variable', 'Open Sans', sans-serif">${esc(c.i)}</text>`,
           );
         }
       }
       if (c.h === payload.headHash) {
         graph.push(
-          `<circle cx="${x}" cy="${y}" r="${r + 3}" fill="none" stroke="${color}" stroke-width="1.4" opacity=".55"/>`,
+          `<circle cx="${x}" cy="${y}" r="${commitR + 3}" fill="none" stroke="${color}" stroke-width="1.4" opacity=".55"/>`,
         );
       }
     }
@@ -890,7 +890,7 @@ export function CommitGraph({
                       textOverflow: "ellipsis",
                       color: "#bdbec3",
                       fontSize: 13,
-                      fontWeight: 500,
+                      fontWeight: 600,
                       fontFamily: FONT,
                       ...(c.mg && { opacity: 0.8 }),
                     }}
@@ -937,11 +937,15 @@ export function CommitGraph({
           paper: {
             sx: {
               bgcolor: '#1f1f1f',
+              backgroundImage: 'none',
+              backdropFilter: 'none',
+              WebkitBackdropFilter: 'none',
               color: '#bdbec3',
               border: '1px solid #363635',
               boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
               py: 0.5,
               minWidth: 280,
+              fontFamily: FONT,
               scrollbarWidth: 'none',
               '&::-webkit-scrollbar': { display: 'none' },
               '& .MuiList-root': {
@@ -1156,11 +1160,15 @@ export function CommitGraph({
             sx: {
               pointerEvents: 'auto',
               bgcolor: '#1f1f1f',
+              backgroundImage: 'none',
+              backdropFilter: 'none',
+              WebkitBackdropFilter: 'none',
               color: '#bdbec3',
               border: '1px solid #363635',
               boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
               py: 0.5,
               minWidth: 180,
+              fontFamily: FONT,
               scrollbarWidth: 'none',
               '&::-webkit-scrollbar': { display: 'none' },
               '& .MuiList-root': {
@@ -1230,11 +1238,15 @@ export function CommitGraph({
             sx: {
               pointerEvents: 'auto',
               bgcolor: '#1f1f1f',
+              backgroundImage: 'none',
+              backdropFilter: 'none',
+              WebkitBackdropFilter: 'none',
               color: '#bdbec3',
               border: '1px solid #363635',
               boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
               py: 0.5,
               minWidth: 180,
+              fontFamily: FONT,
               scrollbarWidth: 'none',
               '&::-webkit-scrollbar': { display: 'none' },
               '& .MuiList-root': {

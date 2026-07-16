@@ -10,7 +10,7 @@ import type { RepoPayload } from "src/types/electron";
 // ----------------------------------------------------------------------
 
 type Tab = {
-  payload: RepoPayload;
+  payload: RepoPayload | null;
   scrollTop: number;
   selectedIdx: number;
 };
@@ -19,6 +19,7 @@ type ToolbarProps = {
   tabs: Tab[];
   activeTab: number;
   onOpenRepo: () => void;
+  onNewTab: () => void;
   onActivateTab: (index: number) => void;
   onCloseTab: (index: number) => void;
 };
@@ -27,6 +28,7 @@ export function Toolbar({
   tabs,
   activeTab,
   onOpenRepo,
+  onNewTab,
   onActivateTab,
   onCloseTab,
 }: ToolbarProps) {
@@ -65,13 +67,15 @@ export function Toolbar({
       ) : (
         tabs.map((tab, i) => (
           <TabChip
-            key={tab.payload.repoPath}
-            label={tab.payload.repoName}
+            key={tab.payload ? tab.payload.repoPath : `new-tab-${i}`}
+            label={tab.payload ? tab.payload.repoName : "Nova Aba"}
             active={i === activeTab}
             color={
-              tab.payload.palette[
-                (tab.payload.commits[0]?.k ?? 0) % tab.payload.palette.length
-              ]
+              tab.payload
+                ? tab.payload.palette[
+                    (tab.payload.commits[0]?.k ?? 0) % tab.payload.palette.length
+                  ]
+                : undefined
             }
             onClick={() => onActivateTab(i)}
             onClose={() => onCloseTab(i)}
@@ -81,7 +85,7 @@ export function Toolbar({
 
       {/* + button */}
       <IconButton
-        onClick={onOpenRepo}
+        onClick={onNewTab}
         size="small"
         title="Nova aba"
         sx={{ ...iconBtnSx, ml: 0.5, fontSize: 15 }}

@@ -9,7 +9,7 @@ import { TitleBar } from './title-bar';
 import { MenuBar } from './menu-bar';
 import { Toolbar } from './toolbar';
 import { ActionBar } from './action-bar';
-import { WelcomeScreen } from 'src/sections/workspace/welcome-screen';
+import { NewTabScreen, addRecentRepo } from 'src/sections/workspace/new-tab-screen';
 import { CommitGraph } from 'src/sections/workspace/commit-graph/commit-graph';
 import { StatusBar } from 'src/sections/workspace/status-bar';
 import { CommitSidebar } from './commit-sidebar';
@@ -25,7 +25,7 @@ const SESSION_KEY = 'gitshark:session';
 type PersistedSession = { paths: string[]; activeIdx: number };
 
 type Tab = {
-  payload: RepoPayload;
+  payload: RepoPayload | null;
   scrollTop: number;
   selectedIdx: number;
 };
@@ -60,14 +60,22 @@ export function GitSharkLayout() {
           const { paths, activeIdx } = JSON.parse(raw) as PersistedSession;
           if (Array.isArray(paths) && paths.length > 0) {
             const results = await Promise.allSettled(
-              paths.slice(0, MAX_TABS).map((p) => window.api.loadRepo(p))
+              paths.slice(0, MAX_TABS).map((p) => {
+                if (p === '') return Promise.resolve(null);
+                return window.api.loadRepo(p);
+              })
             );
             const loaded: Tab[] = [];
             const origIdxs: number[] = [];
             results.forEach((r, i) => {
-              if (r.status === 'fulfilled' && r.value && !('error' in r.value)) {
-                loaded.push({ payload: r.value, scrollTop: 0, selectedIdx: -1 });
-                origIdxs.push(i);
+              if (r.status === 'fulfilled') {
+                if (r.value === null) {
+                  loaded.push({ payload: null, scrollTop: 0, selectedIdx: -1 });
+                  origIdxs.push(i);
+                } else if (r.value && !('error' in r.value)) {
+                  loaded.push({ payload: r.value, scrollTop: 0, selectedIdx: -1 });
+                  origIdxs.push(i);
+                }
               }
             });
             if (loaded.length > 0) {
@@ -92,7 +100,7 @@ export function GitSharkLayout() {
         if ('error' in result) return;
         setTabs((prev) =>
           prev.map((t) =>
-            t.payload.repoPath === changedPath ? { ...t, payload: result as RepoPayload } : t
+            t.payload && t.payload.repoPath === changedPath ? { ...t, payload: result as RepoPayload } : t
           )
         );
       });
@@ -106,7 +114,7 @@ export function GitSharkLayout() {
     localStorage.setItem(
       SESSION_KEY,
       JSON.stringify({
-        paths: tabs.map((t) => t.payload.repoPath),
+        paths: tabs.map((t) => t.payload ? t.payload.repoPath : ''),
         activeIdx: activeTab,
       } satisfies PersistedSession)
     );
@@ -142,16 +150,79 @@ export function GitSharkLayout() {
     }
     if (payload.error) { showToast(payload.error); return; }
 
+    addRecentRepo(payload.repoName, payload.repoPath);
+
     setTabs((prev) => {
-      const existing = prev.findIndex((t) => t.payload.repoPath === payload.repoPath);
+      const existing = prev.findIndex((t) => t.payload?.repoPath === payload.repoPath);
       if (existing >= 0) {
-        const updated = [...prev];
-        updated[existing] = { ...updated[existing], payload };
         setActiveTab(existing);
         showToast('Este repositório já estava aberto — aba atualizada.');
+        return prev;
+      }
+      
+      const current = prev[activeTab];
+      if (current && current.payload === null) {
+        const updated = [...prev];
+        updated[activeTab] = { ...current, payload };
         return updated;
       }
+
       const newTabs = [...prev, { payload, scrollTop: 0, selectedIdx: -1 }];
+      setActiveTab(newTabs.length - 1);
+      return newTabs;
+    });
+  }, [tabs.length, activeTab, showToast]);
+
+  // --- Open recent repo ---
+  const openRecentRepo = useCallback(async (path: string) => {
+    let payload: any;
+    try {
+      payload = await window.api.loadRepo(path);
+    } catch {
+      showToast('Erro de comunicação com o processo principal.');
+      return;
+    }
+    if (payload.error) {
+      showToast(payload.error);
+      return;
+    }
+
+    addRecentRepo(payload.repoName, payload.repoPath);
+
+    setTabs((prev) => {
+      const existing = prev.findIndex((t) => t.payload?.repoPath === payload.repoPath);
+      if (existing >= 0) {
+        setActiveTab(existing);
+        showToast('Este repositório já estava aberto — aba atualizada.');
+        return prev;
+      }
+
+      const current = prev[activeTab];
+      if (current && current.payload === null) {
+        const updated = [...prev];
+        updated[activeTab] = { ...current, payload };
+        return updated;
+      }
+
+      if (prev.length >= MAX_TABS) {
+        showToast('Máximo de 5 repositórios abertos — feche uma aba primeiro.');
+        return prev;
+      }
+
+      const newTabs = [...prev, { payload, scrollTop: 0, selectedIdx: -1 }];
+      setActiveTab(newTabs.length - 1);
+      return newTabs;
+    });
+  }, [activeTab, showToast]);
+
+  // --- Add new tab ---
+  const addNewTab = useCallback(() => {
+    if (tabs.length >= MAX_TABS) {
+      showToast('Máximo de 5 abertos — feche uma aba primeiro.');
+      return;
+    }
+    setTabs((prev) => {
+      const newTabs = [...prev, { payload: null, scrollTop: 0, selectedIdx: -1 }];
       setActiveTab(newTabs.length - 1);
       return newTabs;
     });
@@ -178,7 +249,7 @@ export function GitSharkLayout() {
     setTabs((prev) => {
       const updated = [...prev];
       const tab = updated[activeTab];
-      if (!tab) return prev;
+      if (!tab || !tab.payload) return prev;
       updated[activeTab] = {
         ...tab,
         selectedIdx: tab.selectedIdx === idx ? -1 : idx,
@@ -190,7 +261,7 @@ export function GitSharkLayout() {
   const handleRefresh = useCallback((newPayload: RepoPayload) => {
     setTabs((prev) => {
       const updated = [...prev];
-      if (updated[activeTab]) {
+      if (updated[activeTab] && updated[activeTab].payload) {
         updated[activeTab] = { ...updated[activeTab], payload: newPayload };
       }
       return updated;
@@ -202,7 +273,7 @@ export function GitSharkLayout() {
     setTabs((prev) => {
       const updated = [...prev];
       const tab = updated[activeTab];
-      if (!tab) return prev;
+      if (!tab || !tab.payload) return prev;
       updated[activeTab] = { ...tab, selectedIdx: -1 };
       return updated;
     });
@@ -219,7 +290,7 @@ export function GitSharkLayout() {
   // --- Pull ---
   const handlePull = useCallback(async (mode: PullMode) => {
     const tab = tabs[activeTab];
-    if (!tab || pulling) return;
+    if (!tab || !tab.payload || pulling) return;
 
     setPulling(true);
     try {
@@ -247,7 +318,7 @@ export function GitSharkLayout() {
   // --- Push ---
   const handlePush = useCallback(async () => {
     const tab = tabs[activeTab];
-    if (!tab || pushing) return;
+    if (!tab || !tab.payload || pushing) return;
 
     setPushing(true);
     try {
@@ -272,7 +343,7 @@ export function GitSharkLayout() {
   // --- Create Branch ---
   const handleCreateBranch = useCallback(async (name: string) => {
     const tab = tabs[activeTab];
-    if (!tab) return;
+    if (!tab || !tab.payload) return;
     try {
       const result = await window.api.gitBranch(tab.payload.repoPath, name);
       if (result.error) {
@@ -300,6 +371,7 @@ export function GitSharkLayout() {
         tabs={tabs}
         activeTab={activeTab}
         onOpenRepo={openRepo}
+        onNewTab={addNewTab}
         onActivateTab={activateTab}
         onCloseTab={closeTab}
       />
@@ -336,7 +408,10 @@ export function GitSharkLayout() {
               onRefresh={handleRefresh}
             />
           ) : (
-            <WelcomeScreen onOpenRepo={openRepo} />
+            <NewTabScreen
+              onOpenRepo={openRepo}
+              onOpenRecentRepo={openRecentRepo}
+            />
           )}
         </Box>
         {activePayload && (

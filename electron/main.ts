@@ -413,11 +413,16 @@ async function fetchAvatars(
       ? await fetchAvatarsFromGitHub(slug, uncached)
       : new Map<string, string>();
 
-    // 3. Handle noreply emails as fallback
+    // 3. Handle noreply emails and Gravatar as fallback
     for (const email of uncached) {
       if (avatarUrls.has(email)) continue;
       const m = email.match(/^(?:\d+\+)?([^@]+)@users\.noreply\.github\.com$/);
-      if (m) avatarUrls.set(email, `https://avatars.githubusercontent.com/${m[1]}?s=64`);
+      if (m) {
+        avatarUrls.set(email, `https://avatars.githubusercontent.com/${m[1]}?s=64`);
+      } else {
+        const emailHash = crypto.createHash('md5').update(email.trim().toLowerCase()).digest('hex');
+        avatarUrls.set(email, `https://www.gravatar.com/avatar/${emailHash}?d=404`);
+      }
     }
 
     // 4. Download images in parallel and cache

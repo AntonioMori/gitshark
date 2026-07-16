@@ -512,6 +512,7 @@ export function CommitGraph({
   const svgContent = useMemo(() => {
     const defs: string[] = [];
     const connectors: string[] = [];
+    const backgrounds: string[] = [];
     const graph: string[] = [];
     // GitKraken-style: rounded 90° elbows (quarter-circle arcs via Q bezier)
     const R_MAX = 10;
@@ -609,7 +610,16 @@ export function CommitGraph({
         y = rowY(i + off);
       const color = PAL[c.k % PAL.length];
       const r = COMMIT_R;
-      const commitR = 9;
+      const commitR = c.mg ? 7 : 10;
+
+      // Rectangular shadow (glow) from node center to graphW
+      backgrounds.push(
+        `<rect x="${x}" y="${y - ROW_H / 2}" width="${graphW - x}" height="${ROW_H}" fill="${color}" opacity="0.15"/>`,
+      );
+      // Vertical colored line at the right edge
+      backgrounds.push(
+        `<rect x="${graphW - 2}" y="${y - ROW_H / 2}" width="2" height="${ROW_H}" fill="${color}" opacity="0.8"/>`,
+      );
 
       if (c.r.length > 0) {
         const lineEnd = labelsW + laneX(c.l) - r - 2;
@@ -656,9 +666,9 @@ export function CommitGraph({
 
     return [
       ...connectors,
-      `<g transform="translate(${labelsW},0)"><defs>${defs.join("")}</defs>${graph.join("")}</g>`,
+      `<g transform="translate(${labelsW},0)"><defs>${defs.join("")}</defs>${backgrounds.join("")}${graph.join("")}</g>`,
     ].join("");
-  }, [payload, PAL, off, hasWip, headCommit, headIdx, labelsW]);
+  }, [payload, PAL, off, hasWip, headCommit, headIdx, labelsW, graphW]);
 
   const handleRowClick = useCallback(
     (e: React.MouseEvent) => {
@@ -789,7 +799,7 @@ export function CommitGraph({
             position: "relative",
             display: "flex",
             flexDirection: "column",
-            gap: "4px",
+            gap: "6px",
           }}
           onClick={handleRowClick}
         >
@@ -878,7 +888,7 @@ export function CommitGraph({
                     display: "flex",
                     alignItems: "center",
                     gap: "10px",
-                    px: "14px 14px 14px 10px",
+                    px: "8px",
                     overflow: "hidden",
                     whiteSpace: "nowrap",
                   }}
@@ -889,7 +899,7 @@ export function CommitGraph({
                       overflow: "hidden",
                       textOverflow: "ellipsis",
                       color: "#bdbec3",
-                      fontSize: 13,
+                      fontSize: 12,
                       fontWeight: 600,
                       fontFamily: FONT,
                       ...(c.mg && { opacity: 0.8 }),

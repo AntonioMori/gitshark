@@ -3,7 +3,7 @@ import Box from "@mui/material/Box";
 
 import type { GroupedRef } from "./commit-graph-types";
 import type { RepoRef } from "src/types/electron";
-import { chipBg } from "./utils";
+import { chipBg, FONT } from "./utils";
 
 // ----------------------------------------------------------------------
 
@@ -65,7 +65,7 @@ export function RefLabels({
   const overflow = groups.slice(1);
   const hasOverflow = overflow.length > 0;
   const bg = chipBg(laneColor, 0.25);
-  const bgDark = chipBg(laneColor, 0.14);
+  const bgDark = chipBg(laneColor, 0.24);
 
   return (
     <Box
@@ -102,7 +102,8 @@ export function RefLabels({
             px: "5px",
             fontSize: 10.5,
             fontWeight: 700,
-            color: "rgba(255,255,255,1)",
+            fontFamily: FONT,
+            color: "rgba(255, 255, 255, 0.75)",
             flexShrink: 0,
             transition: "opacity .1s",
           }}
@@ -190,6 +191,7 @@ function RefChip({
         maxHeight: "var(--row-h)",
         fontSize: 12,
         fontWeight: 500,
+        fontFamily: FONT,
         color: "#fff",
         overflow: "hidden",
         whiteSpace: "nowrap",
@@ -271,8 +273,9 @@ function RefExpandedRow({
         height: "var(--row-h)",
         minHeight: "var(--row-h)",
         maxHeight: "var(--row-h)",
-        fontSize: 10,
+        fontSize: 12,
         fontWeight: 500,
+        fontFamily: FONT,
         color: "#fff",
         whiteSpace: "nowrap",
         overflow: "hidden",

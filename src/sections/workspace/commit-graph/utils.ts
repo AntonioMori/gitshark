@@ -11,7 +11,7 @@ export const FONT = '"Open Sans Variable", "Open Sans", sans-serif';
 export const MONO_FONT = "'JetBrains Mono', Consolas, Monaco, Menlo, monospace";
 
 export const ROW_H = 22;
-export const ROW_STRIDE = ROW_H + 4;
+export const ROW_STRIDE = ROW_H + 6;
 
 export function laneX(l: number) {
   return GRAPH_PAD + l * LANE_W + LANE_W / 2;

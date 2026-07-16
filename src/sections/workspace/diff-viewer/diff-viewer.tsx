@@ -10,7 +10,7 @@ import { highlightLine, computeEndDepth } from './syntax-highlight';
 // ---------------------------------------------------------------------------
 
 const FONT = '"JetBrains Mono", "Fira Code", "Cascadia Code", Consolas, monospace';
-const HEADER_FONT = '"Inter Variable", Inter, sans-serif';
+const HEADER_FONT = '"Open Sans Variable", "Open Sans", sans-serif';
 const LINE_HEIGHT = 20;
 const OVERSCAN = 20;
 const MINIMAP_W = 40;

@@ -364,7 +364,7 @@ APP_TEMPLATE = r"""<!DOCTYPE html>
   html, body { height: 100%; }
   body {
     background: var(--bg); color: var(--text);
-    font: 13px/1.45 "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+    font: 13px/1.45 "Open Sans", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
     overflow: hidden;
   }
   code, .mono { font-family: "Cascadia Code", "JetBrains Mono", Consolas, monospace; }
@@ -907,7 +907,7 @@ function renderRepo(tab) {
       parts.push(`<circle cx="${x}" cy="${y}" r="2" fill="var(--bg)"/>`);
     } else {
       parts.push(`<circle cx="${x}" cy="${y}" r="${DOT_R}" fill="hsl(${c.hu} 45% 55%)" stroke="${color}" stroke-width="2"/>`);
-      parts.push(`<text x="${x}" y="${y + 2.6}" text-anchor="middle" font-size="6.5" font-weight="700" fill="#fff" font-family="system-ui">${esc(c.i)}</text>`);
+      parts.push(`<text x="${x}" y="${y + 2.6}" text-anchor="middle" font-size="6.5" font-weight="700" fill="#fff" font-family="'Open Sans Variable', 'Open Sans', system-ui">${esc(c.i)}</text>`);
     }
     if (c.h === D.headHash) {
       parts.push(`<circle cx="${x}" cy="${y}" r="${DOT_R + 3.5}" fill="none" stroke="${color}" stroke-width="1.4" opacity=".55"/>`);

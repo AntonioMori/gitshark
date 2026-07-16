@@ -643,7 +643,7 @@ export function CommitGraph({
             `<circle cx="${x}" cy="${y}" r="${r}" fill="hsl(${c.hu} 45% 55%)" stroke="${color}" stroke-width="2"/>`,
           );
           graph.push(
-            `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="middle" font-size="${r * 0.72}" font-weight="700" fill="#fff" font-family="'Inter Variable', Inter, sans-serif">${esc(c.i)}</text>`,
+            `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="middle" font-size="${r * 0.72}" font-weight="700" fill="#fff" font-family="'Open Sans Variable', 'Open Sans', sans-serif">${esc(c.i)}</text>`,
           );
         }
       }
